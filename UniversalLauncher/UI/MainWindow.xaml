@@ -1,0 +1,49 @@
+﻿<ui:FluentWindow x:Class="UniversalLauncher.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+        Title="Unibox" Height="700" Width="1100"
+        WindowStartupLocation="CenterScreen"
+        Foreground="White"
+        Background="#181818">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <ui:TitleBar Grid.Row="0" Margin="0,0,0,0"/>
+
+        <!-- L'INTERA INTERFACCIA ORA VIVE QUI -->
+        <Grid Grid.Row="1" Margin="30,10,30,30">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <TextBlock x:Name="TxtTitoloPagina" Grid.Row="0" Text="Installed Games" FontSize="32" FontWeight="Bold" Margin="0,0,0,20"/>
+
+            <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,20">
+                <ui:Button x:Name="BtnIndietro" Icon="{ui:SymbolIcon ArrowLeft24}" Visibility="Collapsed" Click="BtnIndietro_Click" Margin="0,0,15,0"/>
+                <ui:TextBox x:Name="TxtSearch" PlaceholderText="Search..." TextChanged="TxtSearch_TextChanged" Icon="{ui:SymbolIcon Search24}" Width="250" Margin="0,0,15,0"/>
+
+                <ui:Button x:Name="BtnCreaCartella" Content="New Folder" Icon="{ui:SymbolIcon FolderAdd24}" Click="BtnNuovaCartella_Click" Appearance="Secondary" Margin="0,0,10,0"/>
+                <ui:Button x:Name="BtnSync" Content="Sync" Icon="{ui:SymbolIcon ArrowSync24}" Margin="10,0,0,0" Click="BtnSync_Click" />
+
+                <Separator Style="{StaticResource {x:Static ToolBar.SeparatorStyleKey}}" Margin="10,0"/>
+
+                <ui:Button x:Name="BtnGridView" Icon="{ui:SymbolIcon Grid24}" Click="SwitchView_Click" Tag="grid" Margin="5,0"/>
+                <ui:Button x:Name="BtnListView" Icon="{ui:SymbolIcon List24}" Click="SwitchView_Click" Tag="list" Margin="5,0"/>
+            </StackPanel>
+
+            <ScrollViewer Grid.Row="2">
+                <WrapPanel x:Name="MainContainer" />
+            </ScrollViewer>
+        </Grid>
+
+        <!-- Fondamentale per i popup di creazione/eliminazione cartelle -->
+        <ui:ContentDialogHost x:Name="RootDialogHost" x:FieldModifier="public" Grid.RowSpan="10" />
+    </Grid>
+</ui:FluentWindow>
