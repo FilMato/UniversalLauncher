@@ -305,8 +305,22 @@ namespace UniversalLauncher
             {
                 if (game.Title != null && _imageCache.ContainsKey(game.Title))
                 {
-                    game.CoverImageUrl = _imageCache[game.Title].CoverUrl;
-                    game.IconImageUrl = _imageCache[game.Title].IconUrl;
+                    //Estraiamo solo il nome del file e lo ricongiungiamo alla cartella attuale
+                    string oldCover = _imageCache[game.Title].CoverUrl;
+                    if (!string.IsNullOrEmpty(oldCover))
+                    {
+                        string fileName = System.IO.Path.GetFileName(oldCover);
+                        game.CoverImageUrl = System.IO.Path.Combine(System.AppDomain.CurrentDomain.BaseDirectory, "ImageCache", fileName);
+                        _imageCache[game.Title].CoverUrl = game.CoverImageUrl; // Aggiorna la memoria corretta
+                    }
+
+                    string oldIcon = _imageCache[game.Title].IconUrl;
+                    if (!string.IsNullOrEmpty(oldIcon))
+                    {
+                        string fileName = System.IO.Path.GetFileName(oldIcon);
+                        game.IconImageUrl = System.IO.Path.Combine(System.AppDomain.CurrentDomain.BaseDirectory, "ImageCache", fileName);
+                        _imageCache[game.Title].IconUrl = game.IconImageUrl; // Aggiorna la memoria corretta
+                    }
                 }
             }
             // Passiamo al setaccio le cartelle e rimuoviamo i giochi disinstallati
