@@ -3,6 +3,7 @@ using System.Windows.Controls;
 using UniversalLauncher.Models;
 using UniversalLauncher.Services;
 using Wpf.Ui.Controls;
+using MessageBox = System.Windows.MessageBox;
 using TextBlock = System.Windows.Controls.TextBlock;
 using TextBox = System.Windows.Controls.TextBox;
 
@@ -44,7 +45,53 @@ namespace UniversalLauncher
 
         private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
+            ControllaApiKey();
             await LoadGamesAndFoldersAsync();
+        }
+        private void ControllaApiKey()
+        {
+            string secretPath = System.IO.Path.Combine(System.AppDomain.CurrentDomain.BaseDirectory, "secrets.json");
+            bool keyMancante = false;
+
+            // Se il file non esiste, lo creiamo noi come "template"
+            if (!System.IO.File.Exists(secretPath))
+            {
+                string template = "{\n  \"SteamGridApiKey\": \"YOUR_API_KEY_HERE\"\n}";
+                System.IO.File.WriteAllText(secretPath, template);
+                keyMancante = true;
+            }
+            else
+            {
+                // Se esiste, controlliamo cosa c'è scritto dentro
+                try
+                {
+                    string json = System.IO.File.ReadAllText(secretPath);
+                    using var doc = System.Text.Json.JsonDocument.Parse(json);
+                    string apiKey = doc.RootElement.GetProperty("SteamGridApiKey").GetString() ?? "";
+
+                    // Se è vuota o ha ancora la scritta di default, mostriamo l'avviso
+                    if (string.IsNullOrWhiteSpace(apiKey) || apiKey == "YOUR_API_KEY_HERE")
+                    {
+                        keyMancante = true;
+                    }
+                }
+                catch
+                {
+                    // Se il file è corrotto o formattato male
+                    keyMancante = true;
+                }
+            }
+
+            if (keyMancante)
+            {
+                MessageBox.Show("Welcome to UniversalLauncher! 🚀\n\n" +
+                                "If you want to visualize game covers and icons, you need to enter a free API Key.\n\n" +
+                                "1. Go to: steamgriddb.com and create an account for free\n" +
+                                "2. Go to: steamgriddb.com/profile/api\n" +
+                                "3. Generate a key and copy it.\n" +
+                                "4. Open the 'secrets.json' file (next to the executable) and paste the key in place of 'YOUR_API_KEY_HERE'.\n\n" +
+                                "The program will still work, but you will only see the default gray icons until you enter the key.");
+            }
         }
 
         // Carica i giochi installati e popola le cartelle di sistema (All games e Uncategorized) in un solo colpo, poi disegna l'interfaccia

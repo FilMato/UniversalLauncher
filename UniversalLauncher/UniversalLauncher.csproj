@@ -18,17 +18,7 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-	  <None Remove="secrets.json" />
-	</ItemGroup>
-
-	<ItemGroup>
 	  <Content Include="favicon.ico" />
-	</ItemGroup>
-
-	<ItemGroup>
-	  <Resource Include="secrets.json">
-	    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-	  </Resource>
 	</ItemGroup>
 
   <ItemGroup>
