@@ -47,6 +47,7 @@ namespace UniversalLauncher
         {
             ControllaApiKey();
             await LoadGamesAndFoldersAsync();
+            CleanUpImageCache();
         }
         private void ControllaApiKey()
         {
@@ -57,7 +58,7 @@ namespace UniversalLauncher
             if (!System.IO.File.Exists(secretPath))
             {
                 string template = "{\n  \"SteamGridApiKey\": \"YOUR_API_KEY_HERE\"\n}";
-                System.IO.File.WriteAllText(secretPath, template);
+                System.IO.File.WriteAllText(secretPath, template, System.Text.Encoding.UTF8);
                 keyMancante = true;
             }
             else
@@ -91,6 +92,44 @@ namespace UniversalLauncher
                                 "3. Generate a key and copy it.\n" +
                                 "4. Open the 'secrets.json' file (next to the executable) and paste the key in place of 'YOUR_API_KEY_HERE'.\n\n" +
                                 "The program will still work, but you will only see the default gray icons until you enter the key.");
+            }
+        }
+
+        //Questa funzione serve ad eliminare le immagini che non sono più collegate a nessun gioco installato, per evitare di accumulare file inutili nella cartella ImageCache.
+        private void CleanUpImageCache()
+        {
+            try
+            {
+                // Trova la cartella ImageCache
+                string cacheFolder = System.IO.Path.Combine(System.AppDomain.CurrentDomain.BaseDirectory, "ImageCache");
+                // Se la cartella non esiste ancora, non c'è nulla da pulire
+                if (!System.IO.Directory.Exists(cacheFolder)) return;
+
+                // 1. Raccogliamo in una lista "intelligente" (HashSet) tutti i percorsi delle immagini IN USO
+                var activeImagePaths = new System.Collections.Generic.HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var game in _gamesController.InstalledGames)
+                {
+                    if (!string.IsNullOrWhiteSpace(game.CoverImageUrl))
+                        activeImagePaths.Add(System.IO.Path.GetFullPath(game.CoverImageUrl));
+
+                    if (!string.IsNullOrWhiteSpace(game.IconImageUrl))
+                        activeImagePaths.Add(System.IO.Path.GetFullPath(game.IconImageUrl));
+                }
+                // 2. Prendiamo tutti i file fisicamente presenti nella cartella
+                string[] filesInCache = System.IO.Directory.GetFiles(cacheFolder);
+                // 3. Per ogni file fisico, se non è nella nostra lista di file in uso, lo eliminiamo!
+                foreach (string file in filesInCache)
+                {
+                    string fullPath = System.IO.Path.GetFullPath(file);
+                    if (!activeImagePaths.Contains(fullPath))
+                    {
+                        System.IO.File.Delete(fullPath);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Errore durante la pulizia della cache: {ex.Message}");
             }
         }
 
@@ -187,6 +226,7 @@ namespace UniversalLauncher
             ApplyScanResults();
             SalvaTutto();
             RefreshFoldersUI();
+            CleanUpImageCache();
             BtnSync.Content = originalContent;
             BtnSync.IsEnabled = true;
         }
@@ -288,7 +328,7 @@ namespace UniversalLauncher
 
                 var options = new System.Text.Json.JsonSerializerOptions { WriteIndented = true };
                 string json = System.Text.Json.JsonSerializer.Serialize(dataToSave, options);
-                System.IO.File.WriteAllText(_configPath, json);
+                System.IO.File.WriteAllText(_configPath, json, System.Text.Encoding.UTF8);
             }
             catch { }
         }
