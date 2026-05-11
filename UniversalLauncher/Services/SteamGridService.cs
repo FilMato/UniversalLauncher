@@ -41,7 +41,8 @@ namespace UniversalLauncher.Services
             {
                 if (string.IsNullOrEmpty(game.Title)) return; // Se il gioco non ha un titolo, non possiamo cercarlo!
                 // PASSO 1 (SEQUENZIALE): Cerchiamo l'ID del gioco partendo dal titolo formattato
-                string searchUrl = $"https://www.steamgriddb.com/api/v2/search/autocomplete/{Uri.EscapeDataString(game.Title)}";
+                string cleanTitle = game.Title.Replace("®", "").Replace("™", "").Replace("©", "").Trim();
+                string searchUrl = $"https://www.steamgriddb.com/api/v2/search/autocomplete/{Uri.EscapeDataString(cleanTitle)}";
                 var searchResponse = await _client.GetStringAsync(searchUrl);
 
                 // Otteniamo la risposta JSON con i possibili giochi che corrispondono al titolo
@@ -117,6 +118,17 @@ namespace UniversalLauncher.Services
                 // Se qualcosa va storto col disco, restituiamo l'URL originale di internet per non far crashare nulla
                 return imageUrl;
             }
+        }
+
+        // Questa funzione pulisce i nomi dei file per evitare problemi con i caratteri proibiti o strani
+        private string GetSafeFilename(string filename)
+        {
+            // 1. Rimuove i caratteri non accettati nei nomi dei file (come \ / : * ? " < > |)
+            string safe = string.Join("_", filename.Split(System.IO.Path.GetInvalidFileNameChars()));
+            // 2. Rimuove i simboli di copyright e marchi 
+            safe = safe.Replace("®", "").Replace("™", "").Replace("©", "");
+            // 3. Toglie eventuali spazi vuoti doppi o all'inizio/fine
+            return safe.Trim();
         }
     }
 }

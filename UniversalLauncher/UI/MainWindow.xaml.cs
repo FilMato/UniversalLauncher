@@ -392,26 +392,50 @@ namespace UniversalLauncher
             {
                 if (game.Title != null && _imageCache.ContainsKey(game.Title))
                 {
-                    //Estraiamo solo il nome del file e lo ricongiungiamo alla cartella attuale
-                    string oldCover = _imageCache[game.Title].CoverUrl;
+                    // --- Controllo COPERTINA ---
+                    string? oldCover = _imageCache[game.Title].CoverUrl;
                     if (!string.IsNullOrEmpty(oldCover))
                     {
                         string fileName = System.IO.Path.GetFileName(oldCover);
-                        game.CoverImageUrl = System.IO.Path.Combine(System.AppDomain.CurrentDomain.BaseDirectory, "ImageCache", fileName);
-                        _imageCache[game.Title].CoverUrl = game.CoverImageUrl; // Aggiorna la memoria corretta
-                    }
+                        string expectedPath = System.IO.Path.Combine(System.AppDomain.CurrentDomain.BaseDirectory, "ImageCache", fileName);
 
-                    string oldIcon = _imageCache[game.Title].IconUrl;
+                        if (System.IO.File.Exists(expectedPath))
+                        {
+                            game.CoverImageUrl = expectedPath;
+                        }
+                        else
+                        {
+                            // IL FILE NON ESISTE: Reset totale per forzare il download
+                            game.CoverImageUrl = "";
+                            _imageCache[game.Title].CoverUrl = "";
+                        }
+                    }
+                    // --- Controllo ICONA ---
+                    string? oldIcon = _imageCache[game.Title].IconUrl;
                     if (!string.IsNullOrEmpty(oldIcon))
                     {
                         string fileName = System.IO.Path.GetFileName(oldIcon);
-                        game.IconImageUrl = System.IO.Path.Combine(System.AppDomain.CurrentDomain.BaseDirectory, "ImageCache", fileName);
-                        _imageCache[game.Title].IconUrl = game.IconImageUrl; // Aggiorna la memoria corretta
+                        string expectedPath = System.IO.Path.Combine(System.AppDomain.CurrentDomain.BaseDirectory, "ImageCache", fileName);
+
+                        if (System.IO.File.Exists(expectedPath))
+                        {
+                            game.IconImageUrl = expectedPath;
+                        }
+                        else
+                        {
+                            game.IconImageUrl = "";
+                            _imageCache[game.Title].IconUrl = "";
+                        }
                     }
                 }
             }
             // Passiamo al setaccio le cartelle e rimuoviamo i giochi disinstallati
             var installedTitles = _gamesController.InstalledGames.Select(g => g.Title).ToList();
+            var giochiDaDimenticare = _imageCache.Keys.Where(titolo => !installedTitles.Contains(titolo)).ToList();
+            foreach (var titolo in giochiDaDimenticare)
+            {
+                _imageCache.Remove(titolo);
+            }
             foreach (var folder in _folderController.Folders)
             {
                 folder.Games.RemoveWhere(gameTitle => !installedTitles.Contains(gameTitle));
