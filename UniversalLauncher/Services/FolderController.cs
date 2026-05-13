@@ -6,16 +6,16 @@ namespace UniversalLauncher.Services
     public class FolderController
     {
         public List<GameFolder> Folders { get; private set; } = new List<GameFolder>();
-
-        public void InizializzaCartelleDiSistema()
+        
+        public void InitializeSystemFolders()
         {
             if (Folders.Count > 0) return;
             Folders.Add(new GameFolder("All games", true));
             Folders.Add(new GameFolder("Uncategorized", true));
         }
 
-        //Controllo se il nome della cartella è valido (non vuoto e non duplicato, a meno che non sia lo stesso nome della cartella che stiamo rinominando)
-        public string? ControllaNuovoNome(string newName, string oldName = "")
+        //Controls if the folder name is valid (not empty and not duplicate, unless it's the same name as the folder we're renaming)
+        public string? ControlNewName(string newName, string oldName = "")
         {
             if (string.IsNullOrWhiteSpace(newName)) return "Name cannot be empty.";
             bool nameExists = Folders.Any(f => f.Name.Equals(newName, StringComparison.OrdinalIgnoreCase));
@@ -23,15 +23,15 @@ namespace UniversalLauncher.Services
             return null; 
         }
 
-        public GameFolder CreaCartella(string name)
+        public GameFolder CreateFolder(string name)
         {
             var newFolder = new GameFolder(name, false);
             Folders.Add(newFolder);
             return newFolder;
         }
 
-        //Eliminazione cartella, con salvataggio dei giochi in "Uncategorized" se non sono presenti in altre cartelle personalizzate
-        public void EliminaCartellaESalvaGiochi(GameFolder folderToDelete)
+        //Deletes the folder and moves its games to "Uncategorized" only if they are not present in any other custom folder
+        public void DeleteFolderAndSaveGames(GameFolder folderToDelete) 
         {
             var uncategorized = Folders.FirstOrDefault(f => f.Name == "Uncategorized");
             foreach (string gameTitle in folderToDelete.Games)
@@ -45,8 +45,8 @@ namespace UniversalLauncher.Services
             Folders.Remove(folderToDelete);
         }
 
-        //Aggiora Uncategorised ogni volta che un gioco viene aggiunto o rimosso da una cartella personalizzata, in modo da mantenere sempre aggiornato lo stato di "Uncategorized"
-        public void AggiornaStatoUncategorized(string gameTitle, int assignedCustomFoldersCount)
+        //Update Uncategorized every time a game is added or removed from a custom folder, to keep the "Uncategorized" status always updated
+        public void UpdateUncategorizedStatus(string gameTitle, int assignedCustomFoldersCount)
         {
             var uncategorized = Folders.FirstOrDefault(f => f.Name == "Uncategorized");
             if (uncategorized != null)
@@ -62,23 +62,23 @@ namespace UniversalLauncher.Services
             }
         }
 
-        // Popola "All games" e "Uncategorized" con tutti i giochi installati all'avvio, in modo da avere una base di partenza per la gestione delle cartelle
-        public void PopolaCartelleDiSistema(List<Game> installedGames)
+        //Populate "All games" and "Uncategorized" with all installed games at startup, to have a starting point for folder management
+        public void PopulateSystemFolders(List<Game> installedGames) 
         {
             var allGamesFolder = Folders.FirstOrDefault(f => f.Name == "All games");
             var uncategorizedFolder = Folders.FirstOrDefault(f => f.Name == "Uncategorized");
 
             if (allGamesFolder != null && uncategorizedFolder != null)
             {
-                uncategorizedFolder.Games.Clear();// Per sicurezza, partiamo da una Uncategorized pulita ad ogni riavvio
+                uncategorizedFolder.Games.Clear();// To be sure we start with an empty "Uncategorized" before populating it
 
                 foreach (var game in installedGames)
                 {
                     if (game.Title != null)
                     {
-                        // 1. Aggiungiamo sempre il gioco a "All games"
+                        //We always add the game to "All games"
                         allGamesFolder.Games.Add(game.Title);
-                        // Inseriamo il gioco in "Uncategorized" solo se non è già presente in nessuna cartella personalizzata
+                        //We add the game to "Uncategorized" only if it's not already present in any custom folder
                         bool isAlreadyCategorized = Folders.Any(f => !f.IsSystemFolder && f.Games.Contains(game.Title));
                         if (!isAlreadyCategorized)
                         {
@@ -92,8 +92,8 @@ namespace UniversalLauncher.Services
             }
         }
 
-        //metodo per assegnare o rimuovere un gioco da una cartella personalizzata
-        public void AssegnaGiocoACartella(string gameTitle, GameFolder folder, bool aggiungi)
+        //Function to assign or remove a game from a custom folder, which also updates the "Uncategorized" status of the game in real time
+        public void AssignGameToFolder(string gameTitle, GameFolder folder, bool aggiungi) 
         {
             if (aggiungi)
             {
@@ -103,9 +103,9 @@ namespace UniversalLauncher.Services
             {
                 if (folder.Games.Contains(gameTitle)) folder.Games.Remove(gameTitle);
             }
-            // Aggiorna Uncategorized in automatico
+            //Update Uncategorized automatically
             int assignedCount = Folders.Count(f => !f.IsSystemFolder && f.Games.Contains(gameTitle));
-            AggiornaStatoUncategorized(gameTitle, assignedCount);
+            UpdateUncategorizedStatus(gameTitle, assignedCount);
         }
     }
 }

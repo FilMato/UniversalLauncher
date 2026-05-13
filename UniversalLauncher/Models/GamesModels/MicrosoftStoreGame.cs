@@ -3,7 +3,7 @@ namespace UniversalLauncher.Models.GamesModels
 {
     public class MicrosoftStoreGame : Game
     {
-        // L'AUMID è l'identificatore univoco per lanciare un'app Store(Formato: "PackageFamilyName!AppId")
+        // The AUMID is the unique identifier to launch a Store app (Format: "PackageFamilyName!AppId")
         public string AUMID { get; set; } = "";
         public MicrosoftStoreGame()
         {
@@ -11,7 +11,7 @@ namespace UniversalLauncher.Models.GamesModels
         }
         public override string GetLaunchCommand()
         {
-            return $"explorer.exe shell:AppsFolder\\{AUMID}"; // Il comando della shell di Windows
+            return $"explorer.exe shell:AppsFolder\\{AUMID}"; // Windows command to launch a Store app using its AUMID
         }
     }
 }

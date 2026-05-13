@@ -1,33 +1,37 @@
 ﻿using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Documents;
 using UniversalLauncher.Models;
 
 namespace UniversalLauncher
 {
     public partial class MainWindow
     {
-        // Le seguenti 3 funzioni servono per mostrare i dialog per creare, rinominare ed eliminare le cartelle. 
-        // Il controller si occupa di tutte le logiche, qui ci limitiamo a mostrare i dialog e a chiamare le funzioni del controller in base alla risposta dell'utente. 
-        // Il funzionamento è abbastanza simile in tutti e 3 i casi
 
-        private async void BtnNuovaCartella_Click(object sender, RoutedEventArgs e)
+        /* This 5 functions are used to show the dialogs for renaming, deleting, personalizing and moving folders.
+         * The controller takes care of all the logic, here we just show the dialogs and call the controller functions based on the user's response.
+         * The functionality is quite similar in all 5 cases.
+         */
+
+
+        // This one have to be mouned somewhere else!!!
+        private async void BtnCreateFolder_Click(object sender, RoutedEventArgs e) 
         {
-            // Popup per chiedere il nome della nuova cartella
+            // Popup to ask the name of the new folder
             var input = new Wpf.Ui.Controls.TextBox { PlaceholderText = "E.g. RPG Games" };
             var dialog = new Wpf.Ui.Controls.ContentDialog(this.RootDialogHost) { Title = "Create new folder", Content = input, PrimaryButtonText = "Create", CloseButtonText = "Cancel" };
-
-            // Se l'utente preme "Create", controlliamo che il nome sia valido e, in caso positivo, creiamo la cartella. Altrimenti mostriamo un messaggio di errore.
+            // If the user clicks "Create", we check if the name is valid and, if it is, we create the folder. Otherwise we show an error message.
             if (await dialog.ShowAsync() == Wpf.Ui.Controls.ContentDialogResult.Primary)
             {
                 string newName = input.Text.Trim();
-                string? error = _folderController.ControllaNuovoNome(newName);
+                string? error = _folderController.ControlNewName(newName);
                 if (error != null)
                 {
                     MessageBox.Show(error, "Error");
                     return;
                 }
-                _folderController.CreaCartella(newName);
-                SalvaTutto();
+                _folderController.CreateFolder(newName);
+                SaveAll();
                 RefreshFoldersUI();
             }
         }
@@ -40,14 +44,14 @@ namespace UniversalLauncher
             if (await dialog.ShowAsync() == Wpf.Ui.Controls.ContentDialogResult.Primary)
             {
                 string newName = input.Text.Trim();
-                string? error = _folderController.ControllaNuovoNome(newName, folderToRename.Name);
+                string? error = _folderController.ControlNewName(newName, folderToRename.Name);
                 if (error != null)
                 {
                     MessageBox.Show(error, "Error");
                     return;
                 }
                 folderToRename.Name = newName;
-                SalvaTutto();
+                SaveAll();
                 RefreshFoldersUI();
             }
         }
@@ -64,22 +68,21 @@ namespace UniversalLauncher
 
             if (await dialog.ShowAsync() == Wpf.Ui.Controls.ContentDialogResult.Primary)
             {
-                _folderController.EliminaCartellaESalvaGiochi(folderToDelete);
-                SalvaTutto();
+                _folderController.DeleteFolderAndSaveGames(folderToDelete);
+                SaveAll();
                 RefreshFoldersUI();
             }
         }
 
         private async void PersonalizeFolderDialog(GameFolder folderToPersonalize)
         {
-            // 1. Creiamo il contenitore a schede STANDARD 
+            // 1. We create the standard tab control container, nothing fancy here
             var tabControl = new System.Windows.Controls.TabControl();
-
             var selectedBrush = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(118, 185, 237));
             var unselectedBrush = System.Windows.Media.Brushes.LightGray;
 
-            // --- TAB 1: COLORE ---
-            // Creiamo gli elementi separatamente così possiamo modificarne il colore in seguito!
+            // --- TAB 1: Color ---
+            // Create the header with the icon and the text, we will change their color when the tab is selected
             var colorIcon = new Wpf.Ui.Controls.SymbolIcon { Symbol = Wpf.Ui.Controls.SymbolRegular.Color24, Margin = new Thickness(0, 0, 8, 0), Foreground = selectedBrush };
             var colorText = new TextBlock { Text = "Color", VerticalAlignment = VerticalAlignment.Center, Foreground = selectedBrush };
             var colorHeader = new StackPanel { Orientation = System.Windows.Controls.Orientation.Horizontal };
@@ -87,25 +90,23 @@ namespace UniversalLauncher
             colorHeader.Children.Add(colorText);
             var colorTab = new System.Windows.Controls.TabItem { Header = colorHeader };
             var colorPanel = new StackPanel { Margin = new Thickness(10) };
-
-            // Titolo della tavolozza
+            // Title of the palette section
             colorPanel.Children.Add(new TextBlock { Text = "Recommended Colors", FontWeight = FontWeights.Bold, Margin = new Thickness(0, 0, 0, 10) });
             var paletteWrap = new WrapPanel { Margin = new Thickness(0, 0, 0, 20) };
-
-            // I nostri colori predefiniti, qui possiamo modificarli ed anggiungerne dei nuovi
+            // Our predefined colors, we can modify and add new ones here
             string[] presetColors = {
-                "#28282D", // Grigio Base (Default)
-                "#204E5F", // Blu Petrolio 
-                "#8f2201", // Rosso Mattone
-                "#2E7D32", // Verde Foresta
-                "#872e87", // Magenta scuro
-                "#B08D57"  // Oro Antico
+                "#28282D", // Base Gray (Default)
+                "#204E5F", // Petrol Blue
+                "#8f2201", // Brick Red
+                "#2E7D32", // Forest Green
+                "#872e87", // Dark magenta
+                "#B08D57"  // Ancient Gold
             };
 
-            // La casella di testo per il colore personalizzato
+            // The text box for the custom color
             var hexInput = new Wpf.Ui.Controls.TextBox { Text = folderToPersonalize.BackgroundColor ?? "#28282D", PlaceholderText = "#HEXCODE" };
 
-            // Generiamo i bottoni colorati
+            // Generate the color buttons, if the user clicks on one of them, it fills the text box with the corresponding hex code
             foreach (var hex in presetColors)
             {
                 var btnColor = new System.Windows.Controls.Button
@@ -117,19 +118,17 @@ namespace UniversalLauncher
                     Cursor = System.Windows.Input.Cursors.Hand,
                     BorderThickness = new Thickness(0)
                 };
-
-                // Se l'utente clicca il quadratino, compila in automatico la casella di testo con quel codice!
+                // If the user clicks the square, it automatically fills the text box with that code
                 btnColor.Click += (s, e) => hexInput.Text = hex;
                 paletteWrap.Children.Add(btnColor);
             }
-
             colorPanel.Children.Add(paletteWrap);
             colorPanel.Children.Add(new TextBlock { Text = "Custom HEX Color", FontWeight = FontWeights.Bold, Margin = new Thickness(0, 0, 0, 10) });
             colorPanel.Children.Add(hexInput);
             colorTab.Content = colorPanel;
 
-            // --- TAB 2: ICONA ---
-            // Stessa cosa, creiamo gli elementi separatamente così possiamo modificare il colore in seguito
+            // --- TAB 2: ICONS ---
+            // Same thing, we create the elements separately so we can change their color later when the tab is selected
             var iconIcon = new Wpf.Ui.Controls.SymbolIcon { Symbol = Wpf.Ui.Controls.SymbolRegular.Image24, Margin = new Thickness(0, 0, 8, 0), Foreground = unselectedBrush };
             var iconText = new TextBlock { Text = "Icon", VerticalAlignment = VerticalAlignment.Center, Foreground = unselectedBrush };
             var iconHeader = new StackPanel { Orientation = System.Windows.Controls.Orientation.Horizontal };
@@ -137,41 +136,41 @@ namespace UniversalLauncher
             iconHeader.Children.Add(iconText);
             var iconTab = new System.Windows.Controls.TabItem { Header = iconHeader };
             var iconPanel = new StackPanel { Margin = new Thickness(10) };
-            // Titolo della sezione icone
+            // Title of the icons section
             iconPanel.Children.Add(new TextBlock { Text = "Choose an Icon", FontWeight = FontWeights.Bold, Margin = new Thickness(0, 0, 0, 10) });
             var iconWrap = new WrapPanel { Margin = new Thickness(0, 0, 0, 20) };
 
-            // Qui mettiamo una serie di nomi di simboli predefiniti, se volete potete aggiungerne altri semplicemente mettendo il nome del simbolo
+            // Here we have a list of predefined symbol names, you can modify and add new ones here by simply putting the name of the symbol
             string[] presetIcons = { 
-                "Folder24",          // Cartella classica
-                "FolderOpen24",      // Cartella aperta
-                "Library24",         // Libreria (ottima per "Tutti i giochi")
-                "Archive24",         // Archivio (per i giochi vecchi)
-                "Box24",             // Scatola/Pacchetto
-                "XboxController24",  // Giochi con controller
-                "Target24",          // Sparatutto / FPS
-                "VehicleCar24",      // Giochi di corse
-                "PuzzlePiece24",     // Puzzle / Rompicapo
-                "Shield24",          // RPG / Avventura / Fantasy
-                "Flash24",           // Azione / Giochi frenetici
-                "Star24",            // Preferiti
-                "Heart24",           // Molto amati
-                "Trophy24",          // Completati al 100% / Competitivi
-                "Flame24",           // Nuove uscite / "In voga"
-                "Globe24",           // Giochi Online / MMO
-                "Cloud24",           // Cloud Gaming
-                "People24",          // Multiplayer / Co-op
-                "Play24",            // Da giocare / In corso
-                "Rocket24",          // Avvio rapido / Giochi leggeri
-                "Wrench24",          // Giochi moddati / Strumenti
-                "Beaker24"           // Beta / Accesso Anticipato
+                "Folder24",          // Classic Folder (Default)
+                "FolderOpen24",      
+                "Library24",         
+                "Archive24",        
+                "Box24",            
+                "XboxController24",  
+                "Target24",       
+                "VehicleCar24",    
+                "PuzzlePiece24",   
+                "Shield24",         
+                "Flash24",           
+                "Star24",            
+                "Heart24",           
+                "Trophy24",          
+                "Flame24",           
+                "Globe24",           
+                "Cloud24",          
+                "People24",         
+                "Play24",           
+                "Rocket24",         
+                "Wrench24",         
+                "Beaker24"          
             };
-            // Variabile per ricordare quale icona abbiamo cliccato
+            // Variable to remember which icon we clicked, if it's null we will use the default one (Folder24)
             string selectedIconName = folderToPersonalize.IconSymbolName ?? "Folder24";
 
             foreach (var iconName in presetIcons)
             {
-                // Convertiamo il testo nel simbolo vero e proprio
+                // We use TryParse to avoid crashes in case of invalid names, but since we are hardcoding them it shouldn't be a problem
                 if (System.Enum.TryParse(iconName, out Wpf.Ui.Controls.SymbolRegular symbolEnum))
                 {
                     var btnIcon = new Wpf.Ui.Controls.Button
@@ -181,19 +180,18 @@ namespace UniversalLauncher
                         Height = 46,
                         Margin = new Thickness(0, 0, 10, 10),
                         Cursor = System.Windows.Input.Cursors.Hand,
-                        // Se è l'icona attualmente selezionata, la coloriamo per farla spiccare
+                        // If it's the currently selected icon, we color it to make it stand out
                         Appearance = iconName == selectedIconName ? Wpf.Ui.Controls.ControlAppearance.Primary : Wpf.Ui.Controls.ControlAppearance.Secondary
                     };
 
                     btnIcon.Click += (s, e) => {
-                        selectedIconName = iconName; // Aggiorniamo la scelta
-
-                        // Resettiamo visivamente tutti i bottoni al colore base (Grigio/Secondary)
+                        selectedIconName = iconName; // Update the selected icon variable with the name of the clicked icon
+                        // Reset all buttons to the base color (Gray/Secondary)
                         foreach (Wpf.Ui.Controls.Button btn in iconWrap.Children)
                         {
                             btn.Appearance = Wpf.Ui.Controls.ControlAppearance.Secondary;
                         }
-                        // E coloriamo solo quello appena cliccato (Primary)
+                        // And color only the one just clicked (Primary)
                         btnIcon.Appearance = Wpf.Ui.Controls.ControlAppearance.Primary;
                     };
                     iconWrap.Children.Add(btnIcon);
@@ -201,13 +199,12 @@ namespace UniversalLauncher
             }
             iconPanel.Children.Add(iconWrap);
             iconTab.Content = iconPanel;
-            //--Se vogliamo aggiongere dei tab vanno qui---------
-            //---------------------------------------------------
-            // Aggiungiamo le schede
+            //--Add additional tabs here---------
+            //-----------------------------------
+            // Update
             tabControl.Items.Add(colorTab);
             tabControl.Items.Add(iconTab);
-
-            // 2. Creiamo il Dialog vero e proprio
+            // Creating the dialog
             var dialog = new Wpf.Ui.Controls.ContentDialog(this.RootDialogHost)
             {
                 Title = $"Personalize '{folderToPersonalize.Name}'",
@@ -215,33 +212,30 @@ namespace UniversalLauncher
                 PrimaryButtonText = "Save",
                 CloseButtonText = "Cancel"
             };
-
-            // 3. Salviamo il risultato
+            //Save the results
             if (await dialog.ShowAsync() == Wpf.Ui.Controls.ContentDialogResult.Primary)
             {
                 folderToPersonalize.BackgroundColor = hexInput.Text.Trim();
                 folderToPersonalize.IconSymbolName = selectedIconName;
-                SalvaTutto();
+                SaveAll();
                 RefreshFoldersUI();
             }
         }
 
-        //Funzione per Scegliere lordinamento delle cartelle
         private void MoveFolder(GameFolder folderToMove, int direction)
         {
-            // Troviamo la posizione attuale della cartella nella lista e calcoliamo la nuova posizione
+            // Find the current position of the folder in the list and calculate the new position
             int currentIndex = _folderController.Folders.IndexOf(folderToMove);
             int newIndex = currentIndex + direction;
-            // Controlliamo che la nuova posizione sia valida (non può andare prima dello zero o oltre il massimo)
+            // Controls that the new position is valid (it can't go before zero or beyond the maximum)
             if (newIndex >= 0 && newIndex < _folderController.Folders.Count)
             {
-                // Rimuoviamo la cartella e la reinseriamo nella nuova posizione
+                //Remove the folder and reinsert it in the new position
                 _folderController.Folders.RemoveAt(currentIndex);
                 _folderController.Folders.Insert(newIndex, folderToMove);
-
-                // Salviamo il nuovo ordine nel file JSON e ricarichiamo l'interfaccia
-                SalvaTutto();
-                RefreshFoldersUI(); // Assicurati che questo sia il nome del tuo metodo per ridisegnare le cartelle (potrebbe chiamarsi LoadFolders o simile)
+                // We save the new order in the JSON file and reload the interface
+                SaveAll();
+                RefreshFoldersUI(); 
             }
         }
     }

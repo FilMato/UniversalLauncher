@@ -11,7 +11,7 @@ namespace UniversalLauncher.Models.GamesModels
 
         public override string GetLaunchCommand()
         {
-            // Il comando universale che dice a Windows di chiamare Epic e avviare il gioco
+            // The universal command that tells Windows to call Epic and launch the game
             return $"com.epicgames.launcher://apps/{AppName}?action=launch&silent=true";
         }
     }

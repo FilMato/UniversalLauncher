@@ -15,7 +15,7 @@
 
         <ui:TitleBar Grid.Row="0" Margin="0,0,0,0"/>
 
-        <!-- L'INTERA INTERFACCIA ORA VIVE QUI -->
+        <!-- The Intire Interface is here -->
         <Grid Grid.Row="1" Margin="30,10,30,30">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
@@ -23,13 +23,13 @@
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
 
-            <TextBlock x:Name="TxtTitoloPagina" Grid.Row="0" Text="Installed Games" FontSize="32" FontWeight="Bold" Margin="0,0,0,20"/>
+            <TextBlock x:Name="TxtPageTitle" Grid.Row="0" Text="Installed Games" FontSize="32" FontWeight="Bold" Margin="0,0,0,20"/>
 
             <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,20">
-                <ui:Button x:Name="BtnIndietro" Icon="{ui:SymbolIcon ArrowLeft24}" Visibility="Collapsed" Click="BtnIndietro_Click" Margin="0,0,15,0"/>
+                <ui:Button x:Name="BtnBack" Icon="{ui:SymbolIcon ArrowLeft24}" Visibility="Collapsed" Click="BtnBack_Click" Margin="0,0,15,0"/>
                 <ui:TextBox x:Name="TxtSearch" PlaceholderText="Search..." TextChanged="TxtSearch_TextChanged" Icon="{ui:SymbolIcon Search24}" Width="250" Margin="0,0,15,0"/>
 
-                <ui:Button x:Name="BtnCreaCartella" Content="New Folder" Icon="{ui:SymbolIcon FolderAdd24}" Click="BtnNuovaCartella_Click" Appearance="Secondary" Margin="0,0,10,0"/>
+                <ui:Button x:Name="BtnCreateFolder" Content="New Folder" Icon="{ui:SymbolIcon FolderAdd24}" Click="BtnCreateFolder_Click" Appearance="Secondary" Margin="0,0,10,0"/>
                 <ui:Button x:Name="BtnSync" Content="Sync" Icon="{ui:SymbolIcon ArrowSync24}" Margin="10,0,0,0" Click="BtnSync_Click" />
 
                 <Separator Style="{StaticResource {x:Static ToolBar.SeparatorStyleKey}}" Margin="10,0"/>
@@ -43,7 +43,7 @@
             </ScrollViewer>
         </Grid>
 
-        <!-- Fondamentale per i popup di creazione/eliminazione cartelle -->
+        <!-- Essential for folder creation/deletion popups -->
         <ui:ContentDialogHost x:Name="RootDialogHost" x:FieldModifier="public" Grid.RowSpan="10" />
     </Grid>
 </ui:FluentWindow>

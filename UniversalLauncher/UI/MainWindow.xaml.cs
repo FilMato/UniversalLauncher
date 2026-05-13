@@ -24,37 +24,38 @@ namespace UniversalLauncher
         {
             InitializeComponent();
 
-            // Inizializzazione Timer Debounce 
+            // Inizializzazione Timer Debounce
+            // Inizialization of the Debounce Timer for saving the library
             _saveTimer = new System.Windows.Threading.DispatcherTimer();
             _saveTimer.Interval = TimeSpan.FromSeconds(2);
             _saveTimer.Tick += (s, e) =>
             {
-                _saveTimer.Stop(); // Ferma il timer per non farlo scattare a ripetizione
-                SalvaTutto();      // Esegue il salvataggio vero e proprio
+                _saveTimer.Stop(); // stops the timer until the next request
+                SaveAll();      
             };
 
             this.Loaded += MainWindow_Loaded;
-            this.Closing += (s, e) => SalvaTutto();
+            this.Closing += (s, e) => SaveAll();
         }
         private void RequestDeferredSave()
         {
-            // Spegnendo e riaccendendo il timer, il conteggio dei 2 secondi riparte da zero!
+            // This way, if the user makes multiple changes in a short time, we won't save the library multiple times unnecessarily, but only once after they've stopped making changes for 2 seconds.
             _saveTimer.Stop();
             _saveTimer.Start();
         }
 
         private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
-            ControllaApiKey();
+            ApiKeyControl();
             await LoadGamesAndFoldersAsync();
             CleanUpImageCache();
         }
-        private void ControllaApiKey()
+        private void ApiKeyControl()
         {
             string secretPath = System.IO.Path.Combine(System.AppDomain.CurrentDomain.BaseDirectory, "secrets.json");
             bool keyMancante = false;
 
-            // Se il file non esiste, lo creiamo noi come "template"
+            // If the file doesn't exist, we create it as a "template"
             if (!System.IO.File.Exists(secretPath))
             {
                 string template = "{\n  \"SteamGridApiKey\": \"YOUR_API_KEY_HERE\"\n}";
@@ -63,14 +64,13 @@ namespace UniversalLauncher
             }
             else
             {
-                // Se esiste, controlliamo cosa c'è scritto dentro
+                // If it exists, we check its content
                 try
                 {
                     string json = System.IO.File.ReadAllText(secretPath);
                     using var doc = System.Text.Json.JsonDocument.Parse(json);
                     string apiKey = doc.RootElement.GetProperty("SteamGridApiKey").GetString() ?? "";
-
-                    // Se è vuota o ha ancora la scritta di default, mostriamo l'avviso
+                    // If it's empty or still has the default text, we show the warning
                     if (string.IsNullOrWhiteSpace(apiKey) || apiKey == "YOUR_API_KEY_HERE")
                     {
                         keyMancante = true;
@@ -78,7 +78,7 @@ namespace UniversalLauncher
                 }
                 catch
                 {
-                    // Se il file è corrotto o formattato male
+                    // If the file is corrupted or badly formatted
                     keyMancante = true;
                 }
             }
@@ -95,29 +95,27 @@ namespace UniversalLauncher
             }
         }
 
-        //Questa funzione serve ad eliminare le immagini che non sono più collegate a nessun gioco installato, per evitare di accumulare file inutili nella cartella ImageCache.
+        // This function deletes images that are no longer linked to any installed game, to prevent accumulating unnecessary files in the ImageCache folder.
         private void CleanUpImageCache()
         {
             try
             {
-                // Trova la cartella ImageCache
+                // Find the ImageCache folder and if it doesn't exist, there's nothing to clean
                 string cacheFolder = System.IO.Path.Combine(System.AppDomain.CurrentDomain.BaseDirectory, "ImageCache");
-                // Se la cartella non esiste ancora, non c'è nulla da pulire
                 if (!System.IO.Directory.Exists(cacheFolder)) return;
 
-                // 1. Raccogliamo in una lista "intelligente" (HashSet) tutti i percorsi delle immagini IN USO
+                // 1. We collect in an "intelligent" list (HashSet) all the paths of the images IN USE
                 var activeImagePaths = new System.Collections.Generic.HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 foreach (var game in _gamesController.InstalledGames)
                 {
                     if (!string.IsNullOrWhiteSpace(game.CoverImageUrl))
                         activeImagePaths.Add(System.IO.Path.GetFullPath(game.CoverImageUrl));
-
                     if (!string.IsNullOrWhiteSpace(game.IconImageUrl))
                         activeImagePaths.Add(System.IO.Path.GetFullPath(game.IconImageUrl));
                 }
-                // 2. Prendiamo tutti i file fisicamente presenti nella cartella
+                // 2. We get all the files physically present in the ImageCache folder
                 string[] filesInCache = System.IO.Directory.GetFiles(cacheFolder);
-                // 3. Per ogni file fisico, se non è nella nostra lista di file in uso, lo eliminiamo!
+                // 3. For each physical file, if it's not in our list of active files, we delete it
                 foreach (string file in filesInCache)
                 {
                     string fullPath = System.IO.Path.GetFullPath(file);
@@ -133,51 +131,43 @@ namespace UniversalLauncher
             }
         }
 
-        // Carica i giochi installati e popola le cartelle di sistema (All games e Uncategorized) in un solo colpo, poi disegna l'interfaccia
+        // Loads the installed games and populates the system folders (All games and Uncategorized) in one go, then draws the interface
         private async Task LoadGamesAndFoldersAsync()
         {
-            _folderController.InizializzaCartelleDiSistema();
-            CaricaTutto(); // Carica le tue cartelle e gli URL salvati
-
-            // Intanto visualizziamo subito l'interfaccia con i giochi salvati l'ultima volta
+            _folderController.InitializeSystemFolders();
+            LoadAll(); 
             RefreshFoldersUI();
-            // Ora avvia la scansione parallela in background senza bloccare la UI
+            // Start the parallel scan in the background without blocking the UI
             await _gamesController.ScanAndLoadGamesAsync();
-            // Diamo ai giochi appena trovati gli URL che già conosciamo
             ApplyScanResults();
-            // Ridisegna l'interfaccia un'ultima volta con i dati freschi appena scansionati
             RefreshFoldersUI();
         }
 
-        // Gestione della barra di ricerca
+        // Search bar management
         private void TxtSearch_TextChanged(object sender, TextChangedEventArgs e)
         {
-            // Aggiorna la query di ricerca ogni volta che l'utente digita qualcosa, pulendo cio che siscrive per rendere la ricerca più flessibile
+            // Update the search query every time the user types something, trimming it and converting to lowercase to make the search more flexible
             var searchBox = sender as TextBox ?? sender as Wpf.Ui.Controls.TextBox;
             _searchQuery = searchBox?.Text?.Trim().ToLower() ?? "";
-
-            // Quando digiti, ricarica all'istante l'interfaccia
+            // While typing, instantly reload the interface to show only the games that match the search query
             if (!string.IsNullOrEmpty(_currentOpenFolderName)) OpenFolder(_currentOpenFolderName);
             else RefreshFoldersUI();
         }
 
         private void OpenFolder(string name)
         {
-            // Aggiornamento intestazione
             _currentOpenFolderName = name;
-            TxtTitoloPagina.Text = name.ToUpper();
-            BtnIndietro.Visibility = Visibility.Visible;
-            if (BtnCreaCartella != null) BtnCreaCartella.Visibility = Visibility.Collapsed;
-
-            // pulisce l'interfaccia e disegna i giochi della cartella selezionata,resettando le dimensioni in modo che i nuovi elementi si adattino dinamicamente allo spazio 
+            TxtPageTitle.Text = name.ToUpper();
+            BtnBack.Visibility = Visibility.Visible;
+            if (BtnCreateFolder != null) BtnCreateFolder.Visibility = Visibility.Collapsed;
+            // Clears the interface and draws the games of the selected folder, resetting the dimensions so that the new elements adapt dynamically to the space
             MainContainer.Children.Clear();
             if (MainContainer is WrapPanel wp)
             {
                 wp.ItemWidth = double.NaN;
                 wp.ItemHeight = double.NaN;
             }
-
-            // Inserisce i giochi nella cartella e li filtra in base alla query di ricerca, se presente
+            // Adds the games in the folder and filters them based on the search query, if present
             var currentFolder = _folderController.Folders.FirstOrDefault(f => f.Name == name);
             if (currentFolder != null && currentFolder.Games.Count > 0)
             {
@@ -185,7 +175,7 @@ namespace UniversalLauncher
                     .Where(g => string.IsNullOrEmpty(_searchQuery) || g.ToLower().Contains(_searchQuery))
                     .ToList();
 
-                // Se ci sono giochi che corrispondono alla ricerca, li disegna, altrimenti mostra un messaggio
+                // If there are games that match the search, it draws them, otherwise it shows a message
                 if (filteredGames.Count > 0)
                 {
                     foreach (string gameTitle in filteredGames)
@@ -205,26 +195,26 @@ namespace UniversalLauncher
             }
         }
 
-        // Funzione per tornare alla visualizzazione principale delle cartelle
-        private void BtnIndietro_Click(object sender, RoutedEventArgs e)
+        // Function to return to the main view of the folders
+        private void BtnBack_Click(object sender, RoutedEventArgs e)
         {
-            TxtTitoloPagina.Text = "Installed Games";
-            BtnIndietro.Visibility = Visibility.Collapsed;
-            if (BtnCreaCartella != null) BtnCreaCartella.Visibility = Visibility.Visible;
+            TxtPageTitle.Text = "Installed Games";
+            BtnBack.Visibility = Visibility.Collapsed;
+            if (BtnCreateFolder != null) BtnCreateFolder.Visibility = Visibility.Visible;
             RefreshFoldersUI();
         }
 
         private async void BtnSync_Click(object sender, RoutedEventArgs e)
         {
-            // Feedback visivo
+            // Visual feedback
             var originalContent = BtnSync.Content;
             BtnSync.Content = "Syncing...";
             BtnSync.IsEnabled = false;
-            // Scansione parallela asincrona
+            // Asynchronous parallel scanning of installed games, which can take a few seconds, especially if the user has a large library.
             await _gamesController.ScanAndLoadGamesAsync();
-            // Aggiorna gli URL delle immagini dei giochi appena scansionati con quelli già presenti nella cache, se disponibili
+            // Update the image URLs of the newly scanned games with those already present in the cache, if available
             ApplyScanResults();
-            SalvaTutto();
+            SaveAll();
             RefreshFoldersUI();
             CleanUpImageCache();
             BtnSync.Content = originalContent;
@@ -241,7 +231,7 @@ namespace UniversalLauncher
             }
         }
 
-        // Funzione per passare dalla visualizzazione a griglia a quella a lista, e viceversa
+        // Function to switch between grid view and list view, and vice versa
         private void SwitchView_Click(object sender, RoutedEventArgs e)
         {
             var btn = sender as Wpf.Ui.Controls.Button;
@@ -254,17 +244,17 @@ namespace UniversalLauncher
             else if (mode == "grid" && _isListView)
             {
                 _isListView = false;
-                _currentOpenFolderName = ""; // in questo modo quando torni alla visualizzazione a griglia, mostri tutte le cartelle 
+                _currentOpenFolderName = ""; // In this way we ensure that when switching back to grid view, we return to the main view with all the folders
                 RefreshFoldersUI();
             }
         }
 
-        // Funzione per far parture i giochi
+        // Function to launch games
         private void LaunchUniversalGame(string launchCommand)
         {
             if (string.IsNullOrEmpty(launchCommand))
             {
-                System.Windows.MessageBox.Show("Comando di avvio mancante per questo gioco.", "Errore");
+                System.Windows.MessageBox.Show("Missing launch command for this game.", "Error");
                 return;
             }
             try
@@ -272,28 +262,28 @@ namespace UniversalLauncher
                 string fileName = launchCommand;
                 string arguments = "";
 
-                // CASO 1: Giochi del Microsoft Store / UWP (es. Minecraft Launcher)
+                // 1 Case: Microsoft Store / UWP games (e.g. Minecraft Launcher)
                 if (launchCommand.StartsWith("explorer.exe ", StringComparison.OrdinalIgnoreCase))
                 {
-                    fileName = "explorer.exe"; // Il programma da avviare è l'esplora risorse
-                    arguments = launchCommand.Substring("explorer.exe ".Length); // Il resto è l'argomento
+                    fileName = "explorer.exe"; // the program to launch is always explorer.exe
+                    arguments = launchCommand.Substring("explorer.exe ".Length); // the argument is everything that comes after "explorer.exe "
                 }
-                // CASO 2: Percorsi racchiusi tra virgolette con argomenti finali (es. Roblox)
+                // 2 Case: Paths enclosed in quotes with final arguments (e.g. Roblox)
                 else if (launchCommand.StartsWith("\""))
                 {
                     int secondQuoteIndex = launchCommand.IndexOf("\"", 1);
                     if (secondQuoteIndex > 0)
                     {
-                        // Estraiamo solo ciò che è dentro le virgolette
+                        // Extract only what is inside the quotes, which is the actual path of the executable to launch
                         fileName = launchCommand.Substring(1, secondQuoteIndex - 1);
-                        // Estraiamo ciò che c'è DOPO le virgolette (gli argomenti)
+                        // Extract what is after the quotes (the arguments)
                         if (launchCommand.Length > secondQuoteIndex + 1)
                         {
                             arguments = launchCommand.Substring(secondQuoteIndex + 1).Trim();
                         }
                     }
                 }
-                // CASO 3: Percorsi senza virgolette ma con argomenti (es. C:\gioco.exe -run)
+                // 3 Case: Paths without quotes but with arguments (e.g. C:\game.exe -run)
                 else if (launchCommand.Contains(".exe ", StringComparison.OrdinalIgnoreCase))
                 {
                     int exeIndex = launchCommand.IndexOf(".exe ", StringComparison.OrdinalIgnoreCase) + 4;
@@ -311,18 +301,16 @@ namespace UniversalLauncher
             }
             catch (Exception ex)
             {
-                System.Windows.MessageBox.Show($"Impossibile avviare il gioco.\nErrore: {ex.Message}", "Errore di avvio");
+                System.Windows.MessageBox.Show($"Impossible to start the game.\nError: {ex.Message}", "Start Error");
             }
         }
 
-        // Salvataggio della libreria
-        public void SalvaTutto()
+        // Saving the library
+        public void SaveAll()
         {
             try
             {
                 var dataToSave = new LibrarySaveData();
-
-                // Salviamo tutte le cartelle
                 dataToSave.Folders = _folderController.Folders.ToList();
                 dataToSave.CachedImages = _imageCache;
 
@@ -333,8 +321,8 @@ namespace UniversalLauncher
             catch { }
         }
 
-        // Caricamento della libreria
-        private void CaricaTutto()
+        // Loading the library 
+        private void LoadAll()
         {
             if (!System.IO.File.Exists(_configPath)) return;
             try
@@ -343,34 +331,31 @@ namespace UniversalLauncher
                 var loadedData = System.Text.Json.JsonSerializer.Deserialize<LibrarySaveData>(json);
                 if (loadedData != null)
                 {
-                    // Fusione intelligente delle cartelle
+                    // Smart merging of folders
                     if (loadedData.Folders != null)
                     {
-                        // 1. Mettiamo da parte le cartelle di sistema create di default dal programma (per non perdere i giochi al loro interno)
+                        // 1. We set aside the system folders created by default by the program (to avoid losing the games inside them)
                         var backupSystemFolders = _folderController.Folders.Where(f => f.IsSystemFolder).ToList();
-                        // 2. Svuotiamo completamente la lista a schermo
-                        _folderController.Folders.Clear();
-                        // 3. Ricostruiamo la lista leggendo il salvataggio riga per riga 
+                        // 2. We completely clear the list on screen
+                        _folderController.Folders.Clear(); 
+                        // 3. We rebuild the list by reading the saved data line by line
                         foreach (var savedFolder in loadedData.Folders)
                         {
-                            // Cerchiamo se questa cartella salvata corrisponde a una delle nostre cartelle di sistema messe da parte
+                            // We look for a match between the saved folder and one of our system folders that we set aside
                             var systemFolder = backupSystemFolders.FirstOrDefault(f => f.Name == savedFolder.Name);
 
                             if (systemFolder != null)
                             {
-                                // È una cartella di sistema: aggiorniamo grafica e la aggiungiamo alla lista
                                 systemFolder.BackgroundColor = savedFolder.BackgroundColor;
                                 systemFolder.IconSymbolName = savedFolder.IconSymbolName;
                                 _folderController.Folders.Add(systemFolder);
                             }
                             else
                             {
-                                // È una cartella personalizzata: la aggiungiamo direttamente
                                 _folderController.Folders.Add(savedFolder);
                             }
                         }
-                        // 4. Caso di sicurezza: se in futuro aggiungiamo una nuova cartella di sistema al programma 
-                        // che non era presente nel vecchio salvataggio, assicuriamoci di non perderla e di metterla in fondo
+                        // 4. Safety case: if in the future we add a new system folder to the program that wasn't present in the old save, let's make sure we don't lose it and add it at the end
                         foreach (var sysFolder in backupSystemFolders)
                         {
                             if (!_folderController.Folders.Contains(sysFolder))
@@ -379,7 +364,6 @@ namespace UniversalLauncher
                             }
                         }
                     }
-
                     _imageCache = loadedData.CachedImages ?? new Dictionary<string, ImageCache>();
                 }
             }
@@ -392,7 +376,7 @@ namespace UniversalLauncher
             {
                 if (game.Title != null && _imageCache.ContainsKey(game.Title))
                 {
-                    // --- Controllo COPERTINA ---
+                    // --- Image Check ---
                     string? oldCover = _imageCache[game.Title].CoverUrl;
                     if (!string.IsNullOrEmpty(oldCover))
                     {
@@ -405,12 +389,12 @@ namespace UniversalLauncher
                         }
                         else
                         {
-                            // IL FILE NON ESISTE: Reset totale per forzare il download
+                            // THE FILE DOES NOT EXIST: Total reset to force the download of the image again
                             game.CoverImageUrl = "";
                             _imageCache[game.Title].CoverUrl = "";
                         }
                     }
-                    // --- Controllo ICONA ---
+                    // --- ICON CHECK ---
                     string? oldIcon = _imageCache[game.Title].IconUrl;
                     if (!string.IsNullOrEmpty(oldIcon))
                     {
@@ -429,19 +413,18 @@ namespace UniversalLauncher
                     }
                 }
             }
-            // Passiamo al setaccio le cartelle e rimuoviamo i giochi disinstallati
+            // We go through the folders and remove uninstalled games
             var installedTitles = _gamesController.InstalledGames.Select(g => g.Title).ToList();
-            var giochiDaDimenticare = _imageCache.Keys.Where(titolo => !installedTitles.Contains(titolo)).ToList();
-            foreach (var titolo in giochiDaDimenticare)
+            var gamesToForget = _imageCache.Keys.Where(titolo => !installedTitles.Contains(titolo)).ToList();
+            foreach (var title in gamesToForget)
             {
-                _imageCache.Remove(titolo);
+                _imageCache.Remove(title);
             }
             foreach (var folder in _folderController.Folders)
             {
                 folder.Games.RemoveWhere(gameTitle => !installedTitles.Contains(gameTitle));
             }
-
-            _folderController.PopolaCartelleDiSistema(_gamesController.InstalledGames);
+            _folderController.PopulateSystemFolders(_gamesController.InstalledGames);
         }
     }
 }

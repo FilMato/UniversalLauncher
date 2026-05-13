@@ -3,7 +3,7 @@ namespace UniversalLauncher.Models.GamesModels
 {
     public class StandaloneGame : Game
     {
-        // Proprietà specifiche per i giochi slegati dai launcher
+        // This class is meant to be used for games that are not tied to any specific launcher.
         public string ExecutablePath { get; set; } = "";
         public string LaunchArguments { get; set; } = "";
         public StandaloneGame()
@@ -13,7 +13,7 @@ namespace UniversalLauncher.Models.GamesModels
 
         public override string GetLaunchCommand()
         {
-            // Mettiamo il percorso tra virgolette per evitare problemi con gli spazi nelle cartelle di Windows e ci attacchiamo gli argomenti (se ci sono)
+            // We put the path in quotes to avoid issues with spaces in Windows folder names and we attach the arguments (if any)
             return $"\"{ExecutablePath}\" {LaunchArguments}".Trim();
         }
     }

@@ -7,7 +7,7 @@ namespace UniversalLauncher.Services.Scanners
 {
     public class UniversalRegistryScanner : IGameScanner
     {
-        // Riceviamo l'intera lista delle piattaforme da scansionare
+        // Recive the entire list of platforms to scan, so we can apply our filters and optimizations in a single pass
         private readonly List<RegistryPlatformConfig> _configs;
         public UniversalRegistryScanner(List<RegistryPlatformConfig> configs)
         {
@@ -16,13 +16,13 @@ namespace UniversalLauncher.Services.Scanners
         public List<Game> GetInstalledGames()
         {
             var installedGames = new List<Game>();
-            // I due percorsi del Registro di Windows (64-bit e 32-bit)
+            // The two paths in the Windows Registry (64-bit and 32-bit)
             string[] registryKeys = new string[]
             {
                 @"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall",
                 @"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall"
             };
-            // Per ogni percorso, cerchiamo tutte le sottocartelle che rappresentano i programmi installati
+            // For each path, we look for all subfolders that represent installed programs
             foreach (var keyPath in registryKeys)
             {
                 using (RegistryKey? key = Registry.LocalMachine.OpenSubKey(keyPath))
@@ -33,25 +33,24 @@ namespace UniversalLauncher.Services.Scanners
                         using (RegistryKey? subKey = key.OpenSubKey(subKeyName))
                         {
                             if (subKey == null) continue;
-                            // Leggiamo le informazioni di base: editore, nome del programma e cartella di installazione, oppure usiamo stringhe vuote per evitare errori
+                            // Reads basic information: publisher, program name and installation folder, or use empty strings to avoid errors
                             string publisher = subKey.GetValue("Publisher") as string ?? "";
                             string title = subKey.GetValue("DisplayName") as string ?? "";
                             string installLocation = subKey.GetValue("InstallLocation") as string ?? "";
-                            // Primo foltro: se manca una di queste informazioni o la cartella di installazione non esiste, non è un gioco valido
+                            // First filter: if any of these information is missing or the installation folder doesn't exist, it's not a valid game
                             if (string.IsNullOrEmpty(title) || string.IsNullOrEmpty(installLocation) || !Directory.Exists(installLocation))
                                 continue;
-                            // Trasformiamo tutto in minuscolo per non farci fregare dalle maiuscole
                             string titleLower = title.ToLower();
                             string publisherLower = publisher.ToLower();
-                            // Controlliamo se questo programma appartiene a una delle nostre piattaforme
+                            // Controls if this program belongs to one of our platforms, applying all our filters in a single pass.
                             foreach (var config in _configs)
                             {
-                                // Secondo foltro: verifica se il publisher del programma contiene una delle nostre parole chiave
+                                // Second filter: check if the publisher of the program contains one of our keywords
                                 bool isPublisherMatch = config.PublisherKeywords.Any(keyword =>
                                     publisherLower.Contains(keyword.ToLower()));
                                 if (isPublisherMatch)
                                 {
-                                    // Terzo filtro: se il titolo del gioco contiene una delle parole chiave di blacklist, lo ignoriamo
+                                    //Third filter: if the game title contains one of the blacklist keywords, we ignore it
                                     bool isBlacklisted = false;
                                     if (config.IgnoredTitles != null && config.IgnoredTitles.Count > 0)
                                     {
@@ -60,7 +59,7 @@ namespace UniversalLauncher.Services.Scanners
                                     }
                                     if (!isBlacklisted)
                                     {
-                                        //Estrazione dell'Eseguibile e Salvataggio
+                                        //Extracting the executable and saving the game
                                         string? executable = FindGameExecutable(installLocation);
                                         if (!string.IsNullOrEmpty(executable))
                                         {
@@ -82,16 +81,15 @@ namespace UniversalLauncher.Services.Scanners
             return installedGames;
         }
 
-        // Funzione per trovare l'eseguibile del gioco
         private string? FindGameExecutable(string installDir)
         {
             try
             {
-                // Impostiamo la nostra soglia (10 MB per i giochi grandi)
+                // We set our threshold (10 MB for big games): if we find an executable larger than this, we can be pretty sure it's the main game executable and we can stop searching immediately.
                 const long MASSIVE_FILE_THRESHOLD = 10 * 1024 * 1024;
                 string? bestExe = null;
                 long maxSize = 0;
-                // Chiamiamo il nostro  metodo di ricerca
+                // We call our search method
                 string? foundHeavyExe = SearchDirectoryIntelligently(installDir, ref bestExe, ref maxSize, MASSIVE_FILE_THRESHOLD);
                 return foundHeavyExe ?? bestExe;
             }
@@ -101,19 +99,19 @@ namespace UniversalLauncher.Services.Scanners
             }
         }
 
-        // motore di ricerca intelligente: cerca in modo ricorsivo, ma con ottimizzazioni per evitare di perdere tempo in cartelle inutili
+        // Smart search engine: it searches recursively, but with optimizations to avoid wasting time in useless folders
         private string? SearchDirectoryIntelligently(string directoryPath, ref string? bestExe, ref long maxSize, long threshold, int currentDepth = 0)
         {
-            // limitiamo la profondità della ricerca per evitare di perderci in cartelle troppo profonde
+            // we set a maximum depth for the search to avoid getting lost in too deep folders, which are unlikely to contain the main executable and can significantly slow down the search.
             if (currentDepth > 4) return null;
 
             try
             {
-                // Esaminiamo prima i file .exe nella cartella attuale
+                // Examine first the .exe files in the current folder,witch is more likely to contain the main executable.
                 foreach (var exe in Directory.EnumerateFiles(directoryPath, "*.exe"))
                 {
                     string fileName = Path.GetFileName(exe).ToLower();
-                    // Lista nera dei nomi di file: se il nome del file contiene una di queste parole chiave lo saltiamo direttamente
+                    // Blacklist of file name keywords: if the file name contains any of these keywords, we skip it directly
                     if (fileName.Contains("cleanup") || fileName.Contains("touchup") ||
                         fileName.Contains("uninstall") || fileName.Contains("unins") ||
                         fileName.Contains("activation") || fileName.Contains("crash") ||
@@ -123,7 +121,7 @@ namespace UniversalLauncher.Services.Scanners
                         continue;
                     }
                     long size = new FileInfo(exe).Length;
-                    // Se superiamo la soglia, abbiamo trovato il jackpot! Fermiamo tutta la ricerca.
+                    // If we exceed the threshold we can be pretty sure we found the main executable, so we return it immediately without searching further
                     if (size > threshold){return exe;}
                     if (size > maxSize)
                     {
@@ -131,11 +129,10 @@ namespace UniversalLauncher.Services.Scanners
                         bestExe = exe;
                     }
                 }
-                //Esaminiamo le sottocartelle
+                // If we haven't found any executable that exceeds the threshold, we continue searching in the subfolders, applying the same optimizations to skip useless folders.
                 foreach (var subDir in Directory.EnumerateDirectories(directoryPath))
                 {
                     string dirName = new DirectoryInfo(subDir).Name.ToLower();
-                    // Lista nera delle sottocartelle: se il nome della sottocartella contiene una di queste parole chiave lo saltiamo direttamente
                     if (dirName == "redist" || dirName == "_redist" || dirName == "support" ||
                         dirName == "movies" || dirName == "video" || dirName == "sound" ||
                         dirName == "audio" || dirName == "music" || dirName == "logs" ||
@@ -144,19 +141,14 @@ namespace UniversalLauncher.Services.Scanners
                     {
                         continue;
                     }
-                    // Se la cartella è valida, entriamo e cerchiamo ricorsivamente
+                    // If the folder is valid, we enter and search recursively
                     string? foundInSub = SearchDirectoryIntelligently(subDir, ref bestExe, ref maxSize, threshold, currentDepth + 1);
-                    // Se la chiamata interna ha trovato un file che supera la soglia, lo passiamo in alto e chiudiamo tutto
+                    // If the internal call found a file that exceeds the threshold, we pass it up and close everything
                     if (foundInSub != null) return foundInSub;
                 }
                 return null;
             }
-            catch (UnauthorizedAccessException)
-            {
-                // Ignora silenziosamente le cartelle di sistema bloccate
-                return null;
-            }
-            catch
+            catch (Exception) 
             {
                 return null;
             }

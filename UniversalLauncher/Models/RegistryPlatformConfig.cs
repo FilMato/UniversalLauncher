@@ -1,14 +1,13 @@
 ﻿
 namespace UniversalLauncher.Models
 {
-    // Questa classe contiene solo i dati che cambiano tra un launcher e l'altro!
+    // This class contains only the data that changes between one launcher and another!
     public class RegistryPlatformConfig
     {
         public string PlatformName { get; set; } = "";
-        // Usiamo una lista così possiamo cercare più parole chiave (es. "Electronic Arts" o "EA")
+        // We use a list so we can search for multiple keywords (e.g. "Electronic Arts" or "EA")
         public List<string> PublisherKeywords { get; set; } = new List<string>();
-        //Usiamo una lista in cui ignorare alcune parole chiave, come i nomi stessi dei launcher, per evitare che vengano erroneamente considerati giochi
+        // We use a list to ignore some keywords, such as the names of the launchers themselves, to avoid them being mistakenly considered games
         public List<string> IgnoredTitles { get; set; } = new List<string>();
-        // Possiamo aggiungere altre particolarità in futuro, se serve
     }
 }

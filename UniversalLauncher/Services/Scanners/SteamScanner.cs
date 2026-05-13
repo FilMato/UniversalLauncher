@@ -13,26 +13,24 @@ namespace UniversalLauncher.Services.Scanners
         public List<Game> GetInstalledGames()
         {
             List<Game> installedGames = new List<Game>();
-            // otteniamo il percorso di installazione di Steam
+            // Obtains the installation path of Steam, if it fails we return an empty list
             string? mainSteamPath = GetSteamInstallationPath();
             if (string.IsNullOrEmpty(mainSteamPath))
             {
                 return installedGames;
             }
-            // otteniamo il percorsi delle librerie in cui steam installa i giochi, possono essere più di una
+            // Selects all library paths where Steam games are installed, there can be more than one
             List<string> libraryPaths = GetLibraryPaths(mainSteamPath);
             foreach (string libPath in libraryPaths)
             {
                 string steamAppsPath = Path.Combine(libPath, "steamapps");
                 if (Directory.Exists(steamAppsPath))
                 {
-                    // cerchiamo tutti i file manifest dei giochi installati, ogni gioco ha un suo .acf
+                    // Each manifest file contains the information of a single game, we parse it and if the title contains "Steamworks" we ignore it (we also check if Title is not null to keep the compiler happy).
                     string[] manifestFiles = Directory.GetFiles(steamAppsPath, "appmanifest_*.acf");
                     foreach (string file in manifestFiles)
                     {
-                        // per ogni manifest, estraiamo le informazioni del gioco, se il titolo contiene "Steamworks" lo ignoriamo
                         Game? parsedGame = ParseManifest(file);
-                        // We also check if Title is not null to keep the compiler happy
                         if (parsedGame != null && parsedGame.Title != null && !parsedGame.Title.Contains("Steamworks"))
                         {
                             installedGames.Add(parsedGame);
@@ -43,7 +41,7 @@ namespace UniversalLauncher.Services.Scanners
             return installedGames;
         }
 
-        // Funzione per ottenere il percorso di installazione di Steam
+        // Function to get the installation path of Steam
         private string? GetSteamInstallationPath()
         {
             try
@@ -52,7 +50,6 @@ namespace UniversalLauncher.Services.Scanners
                 {
                     if (key != null)
                     {
-                        // Changed type to string?
                         string? steamPath = key.GetValue("SteamPath")?.ToString();
                         if (!string.IsNullOrEmpty(steamPath))
                         {
@@ -66,11 +63,11 @@ namespace UniversalLauncher.Services.Scanners
             return null;
         }
 
-        // Funzione per ottenere il percorso delle librerie di Steam
+        // Function to get the paths of Steam libraries
         private List<string> GetLibraryPaths(string mainSteamPath)
         {
             List<string> paths = new List<string> { mainSteamPath };
-            string vdfPath = Path.Combine(mainSteamPath, "steamapps", "libraryfolders.vdf"); // Questo file contiene i percorsi delle librerie aggiuntive di Steam
+            string vdfPath = Path.Combine(mainSteamPath, "steamapps", "libraryfolders.vdf"); // This file contains the paths of all the libraries where Steam games are installed.
             if (File.Exists(vdfPath))
             {
                 string[] lines = File.ReadAllLines(vdfPath);
@@ -93,7 +90,7 @@ namespace UniversalLauncher.Services.Scanners
             return paths;
         }
 
-        // Funzione che estrapola da un manifest le informazioni del gioco, se il titolo contiene "Steamworks" lo ignora
+        //Function that extracts the game information from a manifest file, if the title contains "Steamworks" it ignores it
         private Game? ParseManifest(string filePath)
         {
             try

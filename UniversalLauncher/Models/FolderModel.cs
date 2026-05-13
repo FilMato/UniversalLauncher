@@ -7,8 +7,7 @@ namespace UniversalLauncher.Models
         public HashSet<string> Games { get; set; } = new HashSet<string>();
         public bool IsSystemFolder { get; set; }//Tells the app if this is a default, unremovable folder
 
-        // COSTRUTTORE VUOTO OBBLIGATORIO PER IL JSON
-        public GameFolder() { }
+        public GameFolder() { } // Empty constructor is mandatory for JSON deserialization
         public GameFolder(string name, bool isSystemFolder = false)
         {
             Name = name;

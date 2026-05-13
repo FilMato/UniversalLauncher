@@ -6,7 +6,7 @@ namespace UniversalLauncher.Services
 {
     public class GamesController
     {
-        // La lista dei giochi installati trovati dagli scanner
+        //List of installed games found by the scanners.
         public List<Game> InstalledGames { get; private set; } = new List<Game>();
         private List<IGameScanner> _scanners;
         public Dictionary<string, Game> InstalledGamesDict { get; private set; } = new Dictionary<string, Game>(StringComparer.OrdinalIgnoreCase);
@@ -15,7 +15,7 @@ namespace UniversalLauncher.Services
         {
             _scanners = new List<IGameScanner>
             {
-                // Basta aggiungere una riga qui per implementare nuove piattaforme.
+                // ---Add a new line here to implement new platforms---
                 new UniversalRegistryScanner(new List<RegistryPlatformConfig>
                 {
                     new RegistryPlatformConfig{ PlatformName = "EA App", PublisherKeywords = new List<string> { "Electronic Arts" }, IgnoredTitles = new List<string> { "ea app"}},
@@ -32,20 +32,20 @@ namespace UniversalLauncher.Services
             };
         }
 
-        // Questa funzione esegue la scansione dal vivo e aggiorna la lista dei giochi installati
+        // This function performs a live scan and updates the list of installed games
         public async Task ScanAndLoadGamesAsync()
         {
-            // Creiamo una lista di "lavori" in background (Task.Run), uno per ogni scanner
+            // Creates a list of background "jobs" (Task.Run), one for each scanner
             var tasks = _scanners.Select(scanner => Task.Run(() => scanner.GetInstalledGames())).ToList();
-            //Aspettiamo che tutti gli scanner finiscano contemporaneamente
+            //Awaits the completion of all tasks simultaneously, without blocking the UI thread
             var results = await Task.WhenAll(tasks);
-            // Raccogliamo i risultati di tutti gli scanner in un'unica lista
+            // Regroups the results of all scanners into a single list of games, which may contain duplicates and empty titles at this stage
             var allRawGames = new List<Game>();
             foreach (var resultList in results)
             {
                 allRawGames.AddRange(resultList);
             }
-            //Pulizia: rimuoviamo i nomi vuoti, uniamo i doppioni e le piattaforme, e ordiniamo (Codice identico al tuo!)[cite: 8]
+            // Cleanup: we remove empty titles, merge duplicates and platforms, and sort.
             InstalledGames = allRawGames
                 .Where(g => !string.IsNullOrEmpty(g.Title))
                 .GroupBy(g => g.Title)
@@ -62,17 +62,17 @@ namespace UniversalLauncher.Services
             InstalledGamesDict = InstalledGames.ToDictionary(g => g.Title!, g => g, StringComparer.OrdinalIgnoreCase);
         }
 
-        //Funzione per capire di che piattaforma va trattato un gioco che ne ha di più
+        //Function to determine which platform to prioritize for a game that has multiple platforms
         private int GetPlatformPriority(string platform)
         {
-            if (string.IsNullOrEmpty(platform)) return 99; // Gli sconosciuti in fondo alla coda
+            if (string.IsNullOrEmpty(platform)) return 99; // The unknown platform gets the lowest priority
 
             string p = platform.ToLower();
-            if (p.Contains("steam")) return 1; // Steam vince su tutti (per i suoi link steam://)
-            if (p.Contains("epic")) return 2;  // Epic ha i link com.epicgames.launcher://
+            if (p.Contains("steam")) return 1; // Steam alaws wins over all (because of its steam:// links).
+            if (p.Contains("epic")) return 2;  // Then Epic wins over all the others (because of its com.epicgames.launcher:// links). And so on
             if (p.Contains("microsoft") || p.Contains("xbox")) return 3;
             if (p.Contains("gog")) return 4;
-            return 10; // Tutti gli altri (es. EA, Ubisoft dal RegistryScanner) prendono priorità bassa
+            return 10; //All of the others (like EA, Ubisoft from the RegistryScanner) get low priority.
         }
     }
 }

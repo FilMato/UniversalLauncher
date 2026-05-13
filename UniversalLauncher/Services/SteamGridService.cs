@@ -9,13 +9,13 @@ namespace UniversalLauncher.Services
 {
     public class SteamGridService
     {
-        // Questo è il nostro browser invisibile
+        //This is an invisible browser, that will talk to the SteamGridDB website in the background
         private readonly HttpClient _client;
-        private string _apiKey = ""; // chiave di accesso al sito, che non facciamo visualizzare per ragioni di sicurezza
+        private string _apiKey = ""; // the API key is needed to authenticate our requests, but it's free and you can get it in 2 minutes by registering on https://www.steamgriddb.com/profile/api
         public SteamGridService()
         {
             _client = new HttpClient();
-            // Cerchiamo di leggere la chiave API da un file "secrets.json"
+            // We try to read the API key from a "secrets.json" file located in the same folder as the executable.
             string secretPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "secrets.json");
             if (File.Exists(secretPath))
             {
@@ -34,36 +34,32 @@ namespace UniversalLauncher.Services
             _client.DefaultRequestHeaders.Add("User-Agent", "UniversalLauncher/1.0");
         }
 
-        // Questo metodo usa "async" così il tuo launcher continua a scorrere fluido mentre lui scarica in background
+        // This method is "async" so your launcher keeps scrolling smoothly while it downloads in the background
         public async Task FetchImagesForGameAsync(Game game)
         {
             try
             {
-                if (string.IsNullOrEmpty(game.Title)) return; // Se il gioco non ha un titolo, non possiamo cercarlo!
-                // PASSO 1 (SEQUENZIALE): Cerchiamo l'ID del gioco partendo dal titolo formattato
-                string cleanTitle = game.Title.Replace("®", "").Replace("™", "").Replace("©", "").Trim();
+                if (string.IsNullOrEmpty(game.Title)) return; // If the game doesn't even have a title, we can't do anything, so we exit immediately
+                // 1 Step (sequential): We search for the game ID starting from the formatted title
+                string cleanTitle = game.Title.Replace("®", "").Replace("™", "").Replace("©", "").Trim(); // We clean the title from special characters that might mess up the search, and we also trim it to remove extra spaces at the beginning or end
                 string searchUrl = $"https://www.steamgriddb.com/api/v2/search/autocomplete/{Uri.EscapeDataString(cleanTitle)}";
                 var searchResponse = await _client.GetStringAsync(searchUrl);
-
-                // Otteniamo la risposta JSON con i possibili giochi che corrispondono al titolo
+                // Obtain the JSON response with the possible games that match the title
                 using var searchDoc = JsonDocument.Parse(searchResponse);
                 var dataArray = searchDoc.RootElement.GetProperty("data");
-                if (dataArray.GetArrayLength() == 0) return; // Se non lo trova, ci fermiamo qui
+                if (dataArray.GetArrayLength() == 0) return; // If there are no results, we exit immediately
+                string gameId = dataArray[0].GetProperty("id").GetInt32().ToString(); //We take the ID of the first result, which is usually the most relevant one
 
-                string gameId = dataArray[0].GetProperty("id").GetInt32().ToString(); // Prendiamo l'ID del primo risultato
-
-                // PASSO 2 (PARALLELO): Prepariamo gli indirizzi per la Copertina e per l'Icona
+                // 2 Step (parallel): We prepare the URLs for the Cover and the Icon, and we start the download immediately without waiting for each other, to save time
                 string gridUrl = $"https://www.steamgriddb.com/api/v2/grids/game/{gameId}?dimensions=600x900,342x482";
                 string iconUrl = $"https://www.steamgriddb.com/api/v2/icons/game/{gameId}";
-
-                // INIZIAMO I DOWNLOAD CONTEMPORANEAMENTE! (Senza l'await, le richieste partono subito in background)
                 Task<string> gridTask = _client.GetStringAsync(gridUrl);
                 Task<string> iconTask = _client.GetStringAsync(iconUrl);
 
-                // Aspettiamo che ENTRAMBE le chiamate abbiano finito
+                // Awaiting both calls to finish, so we can process the results together.
                 await Task.WhenAll(gridTask, iconTask);
 
-                // PASSO 3: Leggiamo i risultati della Copertina e SALVIAMO SU DISCO
+                //3 Step (sequential): We read the results of the Cover and SAVE TO DISK
                 using var gridDoc = JsonDocument.Parse(gridTask.Result);
                 var gridData = gridDoc.RootElement.GetProperty("data");
                 if (gridData.GetArrayLength() > 0)
@@ -72,7 +68,7 @@ namespace UniversalLauncher.Services
                     game.CoverImageUrl = await DownloadAndSaveImageAsync(webUrl, gameId, "cover");
                 }
 
-                // PASSO 4: Leggiamo i risultati dell'Icona e SALVIAMO SU DISCO
+                // 4 Step (sequential): We read the results of the Icon and SAVE TO DISK
                 using var iconDoc = JsonDocument.Parse(iconTask.Result);
                 var iconData = iconDoc.RootElement.GetProperty("data");
                 if (iconData.GetArrayLength() > 0)
@@ -83,29 +79,28 @@ namespace UniversalLauncher.Services
             }
             catch (Exception ex)
             {
-                // Stampiamo l'errore nella console di Visual Studio
+                // print the error in the Visual Studio console
                 System.Diagnostics.Debug.WriteLine($"Errore API SteamGrid per {game.Title}: {ex.Message}");
             }
         }
 
-        // Scarica fisicamente l'immagine e ci restituisce il percorso sul nostro PC
+        //Download the image physically and return the path on our PC
         private async Task<string> DownloadAndSaveImageAsync(string imageUrl, string gameId, string suffix)
         {
             if (string.IsNullOrEmpty(imageUrl)) return "";
 
             try
             {
-                // Creiamo una cartella "ImageCache" vicino all'eseguibile del tuo launcher
+                // Create a folder "ImageCache" near the executable of your launcher, to store the downloaded images permanently on the disk, so we don't have to download them again every time
                 string cacheFolder = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ImageCache");
                 Directory.CreateDirectory(cacheFolder); // Se esiste già, non fa nulla
 
-                // Creiamo il nome del file estraendo l'estensione originale (.png o .jpg)
+                // Create the file name by extracting the original extension (.png or .jpg)
                 string extension = Path.GetExtension(imageUrl.Split('?')[0]);
-                if (string.IsNullOrEmpty(extension)) extension = ".jpg"; // Fallback di sicurezza
-
+                if (string.IsNullOrEmpty(extension)) extension = ".jpg"; // Fallback in case we can't extract the extension for some reason
                 string localFilePath = Path.Combine(cacheFolder, $"{gameId}_{suffix}{extension}");
 
-                // Se non l'abbiamo ancora scaricata, la scarichiamo fisicamente!
+                // If the file doesn't exist yet, we download it and save it to disk. If it already exists, we skip the download.
                 if (!File.Exists(localFilePath))
                 {
                     byte[] imageBytes = await _client.GetByteArrayAsync(imageUrl);
@@ -115,20 +110,9 @@ namespace UniversalLauncher.Services
             }
             catch
             {
-                // Se qualcosa va storto col disco, restituiamo l'URL originale di internet per non far crashare nulla
+                // If something goes wrong with the disk, we return the original URL from the internet to avoid crashing anything
                 return imageUrl;
             }
-        }
-
-        // Questa funzione pulisce i nomi dei file per evitare problemi con i caratteri proibiti o strani
-        private string GetSafeFilename(string filename)
-        {
-            // 1. Rimuove i caratteri non accettati nei nomi dei file (come \ / : * ? " < > |)
-            string safe = string.Join("_", filename.Split(System.IO.Path.GetInvalidFileNameChars()));
-            // 2. Rimuove i simboli di copyright e marchi 
-            safe = safe.Replace("®", "").Replace("™", "").Replace("©", "");
-            // 3. Toglie eventuali spazi vuoti doppi o all'inizio/fine
-            return safe.Trim();
         }
     }
 }
