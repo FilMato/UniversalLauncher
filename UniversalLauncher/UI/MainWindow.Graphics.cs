@@ -4,7 +4,6 @@ using UniversalLauncher.Models;
 using UniversalLauncher.Models.GamesModels;
 using UniversalLauncher.Services;
 using Wpf.Ui.Controls;
-using MenuItem = System.Windows.Controls.MenuItem;
 using TextBlock = System.Windows.Controls.TextBlock;
 
 namespace UniversalLauncher
@@ -13,7 +12,7 @@ namespace UniversalLauncher
     {
         private SteamGridService _steamGridService = new SteamGridService();
 
-        // This method is "async" (asynchronous), it will never block your GUI!
+        // This method is "async" (asynchronous), it will never block your GUI
         private async void LoadGameImageAsync(Game game, Border borderControl, bool isIcon)
         {
             // Check if we already have the image URL (icon or cover) for this game. If not, we download it from SteamGridDB.
@@ -46,9 +45,10 @@ namespace UniversalLauncher
                     // Save the URL in the local cache to avoid re-downloading it in the future
                     if (game.Title != null)
                     {
-                        if (!_imageCache.ContainsKey(game.Title)) _imageCache[game.Title] = new ImageCache();
-                        if (isIcon) _imageCache[game.Title].IconUrl = finalUrl;
-                        else _imageCache[game.Title].CoverUrl = finalUrl;
+                        var cache = _libraryService.ImageCache;
+                        if (!cache.ContainsKey(game.Title)) cache[game.Title] = new ImageCache();
+                        if (isIcon) cache[game.Title].IconUrl = finalUrl;
+                        else cache[game.Title].CoverUrl = finalUrl;
                         RequestDeferredSave();
                     }
                 }
@@ -280,7 +280,7 @@ namespace UniversalLauncher
                     playButton.Content = "Starting...";
                     playButton.Icon = new SymbolIcon { Symbol = SymbolRegular.Clock24 };
 
-                    LaunchUniversalGame(gameData.GetLaunchCommand());
+                    GameLauncher.Launch(gameData.GetLaunchCommand());
 
                     await System.Threading.Tasks.Task.Delay(8000); // 8-second Cooldown
 
@@ -395,7 +395,7 @@ namespace UniversalLauncher
                     playButton.Content = "Starting...";
                     playButton.Icon = new SymbolIcon { Symbol = SymbolRegular.Clock24 };
 
-                    LaunchUniversalGame(gameData.GetLaunchCommand());
+                    GameLauncher.Launch(gameData.GetLaunchCommand());
 
                     await System.Threading.Tasks.Task.Delay(8000);
 
@@ -414,90 +414,6 @@ namespace UniversalLauncher
             card.Content = grid;
 
             return card;
-        }
-
-        private ContextMenu CreateGameContextMenu(string gameTitle)
-        {
-            // Main menu preparation
-            var contextMenu = new ContextMenu();
-            var manageItem = new MenuItem { Header = "Manage folders" };
-
-            // Retrieve custom folders
-            var customFolders = _folderController.Folders.Where(f => !f.IsSystemFolder).ToList();
-            if (customFolders.Count > 0)
-            {
-                foreach (var folder in customFolders)
-                {
-                    var folderItem = new MenuItem { Header = folder.Name, IsCheckable = true, IsChecked = folder.Games.Contains(gameTitle), StaysOpenOnClick = true };
-                    folderItem.Click += (s, ev) =>
-                    {
-                        _folderController.AssignGameToFolder(gameTitle, folder, folderItem.IsChecked);
-                        SaveAll();
-                    };
-                    manageItem.Items.Add(folderItem);
-                }
-            }
-            else
-            {
-                manageItem.Items.Add(new MenuItem { Header = "No custom folders", IsEnabled = false });
-            }
-            contextMenu.Items.Add(manageItem);
-
-            // Real-time update
-            contextMenu.Closed += (s, ev) =>
-            {
-                if (_isListView)
-                {
-                    // If we are in list mode, update the list interface
-                    DrawFullListView();
-                }
-                else
-                {
-                    // If we are in grid mode, reload the current folder
-                    if (!string.IsNullOrEmpty(_currentOpenFolderName))
-                    {
-                        OpenFolder(_currentOpenFolderName);
-                    }
-                }
-            };
-            return contextMenu;
-        }
-
-        private ContextMenu CreateFolderContextMenu(GameFolder folder)
-        {
-            var contextMenu = new ContextMenu();
-
-            // 1. Personalize
-            var personalizeItem = new MenuItem { Header = "Personalize", Icon = new Wpf.Ui.Controls.SymbolIcon { Symbol = Wpf.Ui.Controls.SymbolRegular.Color24 } };
-            personalizeItem.Click += (s, ev) => PersonalizeFolderDialog(folder);
-            contextMenu.Items.Add(personalizeItem);
-
-            contextMenu.Items.Add(new Separator());
-
-            // 2. Movement
-            var moveLeftItem = new MenuItem { Header = "Move Left / Up", Icon = new Wpf.Ui.Controls.SymbolIcon { Symbol = Wpf.Ui.Controls.SymbolRegular.ArrowLeft24 } };
-            moveLeftItem.Click += (s, ev) => MoveFolder(folder, -1);
-            contextMenu.Items.Add(moveLeftItem);
-
-            var moveRightItem = new MenuItem { Header = "Move Right / Down", Icon = new Wpf.Ui.Controls.SymbolIcon { Symbol = Wpf.Ui.Controls.SymbolRegular.ArrowRight24 } };
-            moveRightItem.Click += (s, ev) => MoveFolder(folder, 1);
-            contextMenu.Items.Add(moveRightItem);
-
-            // 3. Rename and Delete (Only for non-system folders)
-            if (!folder.IsSystemFolder)
-            {
-                contextMenu.Items.Add(new Separator());
-
-                var renameItem = new MenuItem { Header = "Rename", Icon = new Wpf.Ui.Controls.SymbolIcon { Symbol = Wpf.Ui.Controls.SymbolRegular.Edit24 } };
-                renameItem.Click += (s, ev) => RenameFolderDialog(folder);
-                contextMenu.Items.Add(renameItem);
-
-                var deleteItem = new MenuItem { Header = "Delete", Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Colors.Red), Icon = new Wpf.Ui.Controls.SymbolIcon { Symbol = Wpf.Ui.Controls.SymbolRegular.Delete24, Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Colors.Red) } };
-                deleteItem.Click += (s, ev) => DeleteFolderDialog(folder);
-                contextMenu.Items.Add(deleteItem);
-            }
-
-            return contextMenu;
         }
     }
 }

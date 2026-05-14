@@ -1,6 +1,5 @@
 ﻿using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Documents;
 using UniversalLauncher.Models;
 
 namespace UniversalLauncher
@@ -8,33 +7,11 @@ namespace UniversalLauncher
     public partial class MainWindow
     {
 
-        /* This 5 functions are used to show the dialogs for renaming, deleting, personalizing and moving folders.
+        /* This 3 functions are used to show the dialogs for renaming, deleting and personalizing folders.
          * The controller takes care of all the logic, here we just show the dialogs and call the controller functions based on the user's response.
-         * The functionality is quite similar in all 5 cases.
+         * The functionality is quite similar in all 3 cases.
+         * Note: at the end there also is the MoveFolder function that is used to move the folders up and down, it's not directly called by a dialog but I put it here because it's related to the management of the folders and the UI.
          */
-
-
-        // This one have to be mouned somewhere else!!!
-        private async void BtnCreateFolder_Click(object sender, RoutedEventArgs e) 
-        {
-            // Popup to ask the name of the new folder
-            var input = new Wpf.Ui.Controls.TextBox { PlaceholderText = "E.g. RPG Games" };
-            var dialog = new Wpf.Ui.Controls.ContentDialog(this.RootDialogHost) { Title = "Create new folder", Content = input, PrimaryButtonText = "Create", CloseButtonText = "Cancel" };
-            // If the user clicks "Create", we check if the name is valid and, if it is, we create the folder. Otherwise we show an error message.
-            if (await dialog.ShowAsync() == Wpf.Ui.Controls.ContentDialogResult.Primary)
-            {
-                string newName = input.Text.Trim();
-                string? error = _folderController.ControlNewName(newName);
-                if (error != null)
-                {
-                    MessageBox.Show(error, "Error");
-                    return;
-                }
-                _folderController.CreateFolder(newName);
-                SaveAll();
-                RefreshFoldersUI();
-            }
-        }
 
         private async void RenameFolderDialog(GameFolder folderToRename)
         {
@@ -51,7 +28,7 @@ namespace UniversalLauncher
                     return;
                 }
                 folderToRename.Name = newName;
-                SaveAll();
+                _libraryService.SaveAll();
                 RefreshFoldersUI();
             }
         }
@@ -69,7 +46,7 @@ namespace UniversalLauncher
             if (await dialog.ShowAsync() == Wpf.Ui.Controls.ContentDialogResult.Primary)
             {
                 _folderController.DeleteFolderAndSaveGames(folderToDelete);
-                SaveAll();
+                _libraryService.SaveAll();
                 RefreshFoldersUI();
             }
         }
@@ -217,11 +194,12 @@ namespace UniversalLauncher
             {
                 folderToPersonalize.BackgroundColor = hexInput.Text.Trim();
                 folderToPersonalize.IconSymbolName = selectedIconName;
-                SaveAll();
+                _libraryService.SaveAll();
                 RefreshFoldersUI();
             }
         }
 
+        // This function is not directly called by a dialog, but I put it here beacause it's related to the management of the folders and the UI
         private void MoveFolder(GameFolder folderToMove, int direction)
         {
             // Find the current position of the folder in the list and calculate the new position
@@ -234,7 +212,7 @@ namespace UniversalLauncher
                 _folderController.Folders.RemoveAt(currentIndex);
                 _folderController.Folders.Insert(newIndex, folderToMove);
                 // We save the new order in the JSON file and reload the interface
-                SaveAll();
+                _libraryService.SaveAll();
                 RefreshFoldersUI(); 
             }
         }
