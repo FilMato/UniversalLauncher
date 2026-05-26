@@ -1,15 +1,16 @@
 ﻿using System.Windows;
 using System.Windows.Controls;
 using UniversalLauncher.Models;
+using UniversalLauncher.Services;
 
 namespace UniversalLauncher
 {
     public partial class MainWindow
     {
 
-        /* This 3 functions are used to show the dialogs for renaming, deleting and personalizing folders.
+        /* This functions are used to show the dialogs for renaming, deleting and personalizing folders.
          * The controller takes care of all the logic, here we just show the dialogs and call the controller functions based on the user's response.
-         * The functionality is quite similar in all 3 cases.
+         * The functionality is quite similar in most of the cases.
          * Note: at the end there also is the MoveFolder function that is used to move the folders up and down, it's not directly called by a dialog but I put it here because it's related to the management of the folders and the UI.
          */
 
@@ -198,7 +199,6 @@ namespace UniversalLauncher
                 RefreshFoldersUI();
             }
         }
-
         // This function is not directly called by a dialog, but I put it here beacause it's related to the management of the folders and the UI
         private void MoveFolder(GameFolder folderToMove, int direction)
         {

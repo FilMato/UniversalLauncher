@@ -1,16 +1,23 @@
-﻿using UniversalLauncher.Models;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using UniversalLauncher.Models;
+using UniversalLauncher.Models.GamesModels;
 
 namespace UniversalLauncher.Services
 {
-    // This class handles all persistence operations for the game library:saving/loading the JSON config file and reconciling scan results with the cached image data.
+    // This class handles all persistence operations for the game library: saving/loading the JSON config file and reconciling scan results with the cached image data.
     public class LibraryService
     {
         private readonly FolderController _folderController;
         private readonly GamesController _gamesController;
         private readonly string _configPath;
+        private List<ManualGame> _savedManualGames = new List<ManualGame>();
 
         // In-memory image cache. MainWindow reads and writes it via this property.
         public Dictionary<string, ImageCache> ImageCache { get; private set; } = new();
+        // Dictionary to store the paths of installed emulators (Key: Emulator Name, Value: Exe Path)
+        public Dictionary<string, string> EmulatorPaths { get; private set; } = new();
 
         public LibraryService(
             FolderController folderController,
@@ -27,10 +34,13 @@ namespace UniversalLauncher.Services
         {
             try
             {
+                var manualGamesToSave = _gamesController.InstalledGames.OfType<ManualGame>().ToList();
                 var dataToSave = new LibrarySaveData
                 {
                     Folders = _folderController.Folders.ToList(),
-                    CachedImages = ImageCache
+                    CachedImages = ImageCache,
+                    ManualGames = manualGamesToSave,
+                    EmulatorPaths = this.EmulatorPaths 
                 };
                 var options = new System.Text.Json.JsonSerializerOptions { WriteIndented = true };
                 string json = System.Text.Json.JsonSerializer.Serialize(dataToSave, options);
@@ -55,6 +65,17 @@ namespace UniversalLauncher.Services
                 if (loadedData.Folders != null)
                     MergeFolders(loadedData.Folders);
 
+                if (loadedData.ManualGames != null)
+                {
+                    _savedManualGames = loadedData.ManualGames;
+                }
+
+                // Load the emulator paths if they exist in the save file
+                if (loadedData.EmulatorPaths != null)
+                {
+                    EmulatorPaths = loadedData.EmulatorPaths;
+                }
+
                 // Replace the whole dictionary (LoadAll is the only place this happens)
                 ImageCache = loadedData.CachedImages ?? new Dictionary<string, ImageCache>();
             }
@@ -72,7 +93,8 @@ namespace UniversalLauncher.Services
                 .Where(f => f.IsSystemFolder)
                 .ToList();
             _folderController.Folders.Clear();
-            // 2.  We rebuild the list by reading the saved data line by line
+
+            // 2. We rebuild the list by reading the saved data line by line
             foreach (var savedFolder in savedFolders)
             {
                 var systemFolder = backupSystemFolders
@@ -89,6 +111,7 @@ namespace UniversalLauncher.Services
                     _folderController.Folders.Add(savedFolder);
                 }
             }
+
             // 3. Safety case: if in the future we add a new system folder to the program that wasn't present in the old save, let's make sure we don't lose it and add it at the end
             foreach (var sysFolder in backupSystemFolders)
             {
@@ -100,15 +123,59 @@ namespace UniversalLauncher.Services
         // This method is called after every scan and reconciles the scan results with the cached image paths, removing any entries for uninstalled games.
         public void ApplyScanResults()
         {
+            // Emulator Cleanup - Remove registered emulators if their executable was deleted from the PC
+            var survivingEmulators = new Dictionary<string, string>();
+            foreach (var kvp in EmulatorPaths)
+            {
+                if (System.IO.File.Exists(kvp.Value))
+                {
+                    survivingEmulators.Add(kvp.Key, kvp.Value);
+                }
+            }
+            EmulatorPaths = survivingEmulators;
+
+            // Manual & Emulated Games Check
+            // We go through the list of manual games and check if BOTH the emulator/game exe AND the ROM file still exist.
+            var manualGamesInstalled = new List<ManualGame>();
+            foreach (var manualGame in _savedManualGames)
+            {
+                string cleanExe = manualGame.ExePath.Trim('"');
+
+                // Does the executable (game or emulator) still exist?
+                bool exeExists = System.IO.File.Exists(cleanExe);
+
+                // If it's an emulated game, does the ROM file still exist? (If RomPath is empty, it assumes true for standard manual games)
+                bool romExists = string.IsNullOrEmpty(manualGame.RomPath) || System.IO.File.Exists(manualGame.RomPath.Trim('"'));
+
+                // Both files must exist for the game to survive the sync and remain in the library
+                if (exeExists && romExists)
+                {
+                    manualGamesInstalled.Add(manualGame);
+
+                    if (!_gamesController.InstalledGames.Any(g => g.Title == manualGame.Title))
+                    {
+                        _gamesController.InstalledGames.Add(manualGame);
+                    }
+                    if (manualGame.Title != null && !_gamesController.InstalledGamesDict.ContainsKey(manualGame.Title))
+                    {
+                        _gamesController.InstalledGamesDict.Add(manualGame.Title, manualGame);
+                    }
+                }
+            }
+            _savedManualGames = manualGamesInstalled;
+
+            // --- Regular Game Images Check ---
             foreach (var game in _gamesController.InstalledGames)
             {
                 if (game.Title == null || !ImageCache.ContainsKey(game.Title))
                     continue;
+
                 // Cover Check
                 ReconcileImagePath(
                     game.Title,
                     ImageCache[game.Title].CoverUrl,
                     path => { game.CoverImageUrl = path; ImageCache[game.Title].CoverUrl = path; });
+
                 // Icon Check
                 ReconcileImagePath(
                     game.Title,
@@ -120,12 +187,14 @@ namespace UniversalLauncher.Services
             var installedTitles = _gamesController.InstalledGames
                 .Select(g => g.Title)
                 .ToList();
+
             foreach (var staleTitle in ImageCache.Keys
                 .Where(t => !installedTitles.Contains(t))
                 .ToList())
             {
                 ImageCache.Remove(staleTitle);
             }
+
             foreach (var folder in _folderController.Folders)
                 folder.Games.RemoveWhere(title => !installedTitles.Contains(title));
 
@@ -162,8 +231,10 @@ namespace UniversalLauncher.Services
                     if (!string.IsNullOrWhiteSpace(game.IconImageUrl))
                         activeImagePaths.Add(System.IO.Path.GetFullPath(game.IconImageUrl));
                 }
+
                 // 2. We get all the files physically present in the ImageCache folder
                 string[] filesInCache = System.IO.Directory.GetFiles(cacheFolder);
+
                 // 3. For each physical file, if it's not in our list of active files, we delete it
                 foreach (string file in filesInCache)
                 {
@@ -180,5 +251,12 @@ namespace UniversalLauncher.Services
             }
         }
 
+        public void AddManualGameToMemory(ManualGame newGame)
+        {
+            if (!_savedManualGames.Any(g => g.Title == newGame.Title))
+            {
+                _savedManualGames.Add(newGame);
+            }
+        }
     }
 }

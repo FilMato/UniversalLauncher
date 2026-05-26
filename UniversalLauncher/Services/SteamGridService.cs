@@ -114,5 +114,38 @@ namespace UniversalLauncher.Services
                 return imageUrl;
             }
         }
+
+        // This function is used to search for games based on a query string,it is used to make sure that a game exists and have the actual name.
+        // it returns a dictionary where the key is the game ID (as a string) and the value is the official name of the game.
+        public async Task<Dictionary<string, string>> SearchGamesListAsync(string query)
+        {
+            var results = new Dictionary<string, string>();
+            if (string.IsNullOrWhiteSpace(query)) return results;
+
+            try
+            {
+                string searchUrl = $"https://www.steamgriddb.com/api/v2/search/autocomplete/{Uri.EscapeDataString(query)}";
+                var response = await _client.GetStringAsync(searchUrl);
+
+                using var doc = JsonDocument.Parse(response);
+                var data = doc.RootElement.GetProperty("data");
+                // We take the first 10 results 
+                int count = 0;
+                foreach (var item in data.EnumerateArray())
+                {
+                    if (count >= 10) break;
+                    string id = item.GetProperty("id").GetInt32().ToString();
+                    string name = item.GetProperty("name").GetString() ?? "Unknown";
+
+                    if (!results.ContainsKey(id))
+                    {
+                        results.Add(id, name);
+                        count++;
+                    }
+                }
+            }
+            catch { }
+            return results;
+        }
     }
 }

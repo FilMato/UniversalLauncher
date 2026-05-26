@@ -39,8 +39,8 @@ namespace UniversalLauncher
         private void RequestDeferredSave()
         {
             // This way, if the user makes multiple changes in a short time, we won't save the library multiple times unnecessarily, but only once after they've stopped making changes for 2 seconds.
-            _saveTimer.Stop();
-            _saveTimer.Start();
+            _saveTimer?.Stop();
+            _saveTimer?.Start();
         }
 
         private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
@@ -48,6 +48,16 @@ namespace UniversalLauncher
             ApiKeyControl();
             await LoadGamesAndFoldersAsync();
             _libraryService.CleanUpImageCache();
+            // Passiamo gli strumenti di MainWindow al pannello Settings
+            SettingsControl.Initialize(_libraryService, _steamGridService, RootDialogHost);
+            // Ascoltiamo i comandi dal pannello Settings
+            SettingsControl.LibraryUpdated += RefreshFoldersUI;
+            SettingsControl.CloseRequested += () =>
+            {
+                SettingsDrawer.Visibility = Visibility.Collapsed;
+                BtnSettings.Visibility = Visibility.Visible;
+            };
+            SettingsControl.SyncRequested += async (syncButton) => await PerformLibrarySync(syncButton);
         }
     }
 }

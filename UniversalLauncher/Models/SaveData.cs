@@ -1,12 +1,21 @@
-﻿
+﻿using System.Collections.Generic;
+using UniversalLauncher.Models.GamesModels;
+
 namespace UniversalLauncher.Models
 {
     // This is the "Master" object that we will write to the config.json file
     public class LibrarySaveData
     {
         public List<GameFolder> Folders { get; set; } = new List<GameFolder>();
+
         public Dictionary<string, ImageCache> CachedImages { get; set; } = new Dictionary<string, ImageCache>();
+
+        public List<ManualGame> ManualGames { get; set; } = new List<ManualGame>();
+
+        // A dictionary to remember where each emulator is located on the PC
+        public Dictionary<string, string> EmulatorPaths { get; set; } = new Dictionary<string, string>();
     }
+
     // This class will store only the heavy URLs of images and icons, so we don't have to fetch them every time we load the app.
     public class ImageCache
     {

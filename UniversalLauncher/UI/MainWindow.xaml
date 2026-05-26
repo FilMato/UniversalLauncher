@@ -2,6 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+        xmlns:local="clr-namespace:UniversalLauncher"
         Title="Unibox" Height="700" Width="1100"
         WindowStartupLocation="CenterScreen"
         Foreground="White"
@@ -15,35 +16,66 @@
 
         <ui:TitleBar Grid.Row="0" Margin="0,0,0,0"/>
 
-        <!-- The Intire Interface is here -->
-        <Grid Grid.Row="1" Margin="30,10,30,30">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="*"/>
-            </Grid.RowDefinitions>
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
 
-            <TextBlock x:Name="TxtPageTitle" Grid.Row="0" Text="Installed Games" FontSize="32" FontWeight="Bold" Margin="0,0,0,20"/>
+            <Grid Grid.Column="0">
 
-            <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,20">
-                <ui:Button x:Name="BtnBack" Icon="{ui:SymbolIcon ArrowLeft24}" Visibility="Collapsed" Click="BtnBack_Click" Margin="0,0,15,0"/>
-                <ui:TextBox x:Name="TxtSearch" PlaceholderText="Search..." TextChanged="TxtSearch_TextChanged" Icon="{ui:SymbolIcon Search24}" Width="250" Margin="0,0,15,0"/>
+                <ui:Button 
+                    x:Name="BtnSettings" 
+                    Icon="{ui:SymbolIcon Settings24}" 
+                    FontSize="26"
+                    Padding="8"
+                    HorizontalAlignment="Right" 
+                    VerticalAlignment="Top" 
+                    Margin="0,0,10,0" 
+                    Appearance="Transparent" 
+                    Click="ToggleSettings_Click" 
+                    ToolTip="Open Settings"
+                    Panel.ZIndex="200"/>
 
-                <ui:Button x:Name="BtnCreateFolder" Content="New Folder" Icon="{ui:SymbolIcon FolderAdd24}" Click="BtnCreateFolder_Click" Appearance="Secondary" Margin="0,0,10,0"/>
-                <ui:Button x:Name="BtnSync" Content="Sync" Icon="{ui:SymbolIcon ArrowSync24}" Margin="10,0,0,0" Click="BtnSync_Click" />
+                <Grid Margin="30,10,30,30">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
 
-                <Separator Style="{StaticResource {x:Static ToolBar.SeparatorStyleKey}}" Margin="10,0"/>
+                    <TextBlock x:Name="TxtPageTitle" Grid.Row="0" Text="Installed Games" FontSize="32" FontWeight="Bold" Margin="0,0,0,20"/>
 
-                <ui:Button x:Name="BtnGridView" Icon="{ui:SymbolIcon Grid24}" Click="SwitchView_Click" Tag="grid" Margin="5,0"/>
-                <ui:Button x:Name="BtnListView" Icon="{ui:SymbolIcon List24}" Click="SwitchView_Click" Tag="list" Margin="5,0"/>
-            </StackPanel>
+                    <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,20">
+                        <ui:Button x:Name="BtnBack" Icon="{ui:SymbolIcon ArrowLeft24}" Visibility="Collapsed" Click="BtnBack_Click" Margin="0,0,15,0"/>
+                        <ui:TextBox x:Name="TxtSearch" PlaceholderText="Search..." TextChanged="TxtSearch_TextChanged" Icon="{ui:SymbolIcon Search24}" Width="250" Margin="0,0,15,0"/>
 
-            <ScrollViewer Grid.Row="2">
-                <WrapPanel x:Name="MainContainer" />
-            </ScrollViewer>
+                        <ui:Button x:Name="BtnCreateFolder" Content="New Folder" Icon="{ui:SymbolIcon FolderAdd24}" Click="BtnCreateFolder_Click" Appearance="Secondary" Margin="0,0,10,0"/>
+
+                        <Separator Style="{StaticResource {x:Static ToolBar.SeparatorStyleKey}}" Margin="10,0"/>
+
+                        <ui:Button x:Name="BtnGridView" Icon="{ui:SymbolIcon Grid24}" Click="SwitchView_Click" Tag="grid" Margin="5,0"/>
+                        <ui:Button x:Name="BtnListView" Icon="{ui:SymbolIcon List24}" Click="SwitchView_Click" Tag="list" Margin="5,0"/>
+                    </StackPanel>
+
+                    <ScrollViewer Grid.Row="2">
+                        <WrapPanel x:Name="MainContainer" />
+                    </ScrollViewer>
+                </Grid>
+            </Grid>
+
+            <Border x:Name="SettingsDrawer" Grid.Column="1" Width="320" HorizontalAlignment="Right" Background="#202025" 
+                    BorderBrush="#3F3F46" BorderThickness="1,0,0,0" Visibility="Collapsed">
+                <Border.Effect>
+                    <DropShadowEffect BlurRadius="20" Opacity="0.5" Direction="180" ShadowDepth="0" />
+                </Border.Effect>
+
+                <local:SettingsDrawerControl x:Name="SettingsControl" />
+            </Border>
+
         </Grid>
 
-        <!-- Essential for folder creation/deletion popups -->
-        <ui:ContentDialogHost x:Name="RootDialogHost" x:FieldModifier="public" Grid.RowSpan="10" />
+        <ui:ContentDialogHost x:Name="RootDialogHost" x:FieldModifier="public" Grid.RowSpan="10" Panel.ZIndex="999" />
+
     </Grid>
 </ui:FluentWindow>

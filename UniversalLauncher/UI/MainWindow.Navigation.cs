@@ -69,21 +69,22 @@ namespace UniversalLauncher
             RefreshFoldersUI();
         }
 
-        private async void BtnSync_Click(object sender, RoutedEventArgs e)
+        private async Task PerformLibrarySync(Wpf.Ui.Controls.Button btnSync)
         {
-            // Visual feedback
-            var originalContent = BtnSync.Content;
-            BtnSync.Content = "Syncing...";
-            BtnSync.IsEnabled = false;
-            // Asynchronous parallel scanning of installed games, which can take a few seconds, especially if the user has a large library.
+            // Feedback visivo sul bottone del pannello
+            var originalContent = btnSync.Content;
+            btnSync.Content = "Syncing...";
+            btnSync.IsEnabled = false;
+
             await _gamesController.ScanAndLoadGamesAsync();
-            // Update the image URLs of the newly scanned games with those already present in the cache, if available
             _libraryService.ApplyScanResults();
             _libraryService.SaveAll();
             RefreshFoldersUI();
             _libraryService.CleanUpImageCache();
-            BtnSync.Content = originalContent;
-            BtnSync.IsEnabled = true;
+
+            // Ripristina il bottone
+            btnSync.Content = originalContent;
+            btnSync.IsEnabled = true;
         }
 
         // Function to switch between grid view and list view, and vice versa
@@ -125,6 +126,20 @@ namespace UniversalLauncher
             }
         }
 
+        // Toggles the visibility of the settings drawer
+        private void ToggleSettings_Click(object sender, System.Windows.RoutedEventArgs e)
+        {
+            if (SettingsDrawer.Visibility == System.Windows.Visibility.Collapsed)
+            {
+                SettingsDrawer.Visibility = System.Windows.Visibility.Visible;
+                BtnSettings.Visibility = Visibility.Collapsed; // NASCONDE l'ingranaggio
+            }
+            else
+            {
+                SettingsDrawer.Visibility = System.Windows.Visibility.Collapsed;
+                BtnSettings.Visibility = Visibility.Visible; // MOSTRA l'ingranaggio
+            }
+        }
 
         private void RefreshFoldersUI()
         {
